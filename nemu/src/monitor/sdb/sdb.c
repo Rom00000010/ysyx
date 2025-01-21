@@ -18,6 +18,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "sdb.h"
+#include "memory/vaddr.h"
 
 static int is_batch_mode = false;
 
@@ -74,11 +75,34 @@ static int cmd_info(char *args) {
   // extract argument
   char *arg = strtok(NULL, " ");
 
-  if (strcmp(arg, "r") == 0){
+  if (strcmp(arg, "r") == 0) {
     isa_reg_display();
-  }else {
+  } else {
     // TODO for w
   }
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  int i, j;
+  // extract number and Expr
+  char *num_str = strtok(NULL, " ");
+  char *expr = strtok(NULL, " ");
+  uint64_t num = strtoull(num_str, NULL, 0);
+
+  // expression evaluation(decimal or hex direct addr)
+  vaddr_t vaddr = strtoul(expr, NULL, 0);
+
+  for (i = 0; i < num; i += 4) {
+    // start address
+    printf("%s0x%x%s: ", ANSI_FG_BLUE, vaddr + 4 * i, ANSI_NONE );
+    for (j = 0; j < 4; j++) {
+      word_t value = vaddr_read(vaddr + 4 * i + 4 * j, 4);
+      printf("0x%08x    ", value);
+    }
+    printf("\n");
+  }
+
   return 0;
 }
 
@@ -94,6 +118,7 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
   { "si", "Step", cmd_si},
   { "info", "Info", cmd_info},
+  { "x", "Scan memory", cmd_x},
   /* TODO: Add more commands */
 
 };
