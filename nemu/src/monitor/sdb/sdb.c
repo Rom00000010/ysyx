@@ -59,13 +59,25 @@ static int cmd_si(char *args) {
 
   if (arg == NULL) {
     /* no argument given */
-    cpu_exec(1);  
+    cpu_exec(1);
   } else {
     uint64_t steps = 0;
     // convert char* to unsigned long long int
     steps = strtoull(arg, NULL, 0);
     assert(steps != 0);
     cpu_exec(steps);
+  }
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  // extract argument
+  char *arg = strtok(NULL, " ");
+
+  if (strcmp(arg, "r") == 0){
+    isa_reg_display();
+  }else {
+    // TODO for w
   }
   return 0;
 }
@@ -81,6 +93,7 @@ static struct {
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
   { "si", "Step", cmd_si},
+  { "info", "Info", cmd_info},
   /* TODO: Add more commands */
 
 };
