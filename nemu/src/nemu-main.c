@@ -15,6 +15,7 @@
 
 #include <common.h>
 
+void calculator_test(); 
 void init_monitor(int, char *[]);
 void am_init_monitor();
 void engine_start();
@@ -27,7 +28,8 @@ int main(int argc, char *argv[]) {
 #else
   init_monitor(argc, argv);
 #endif
-
+  
+  // calculator_test();
   /* Start engine. */
   engine_start();
 

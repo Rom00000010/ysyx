@@ -21,7 +21,7 @@
 #include <regex.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ,
+  TK_NOTYPE = 256, TK_EQ, TK_DIGIT,
 
   /* TODO: Add more token types */
 
@@ -36,8 +36,14 @@ static struct rule {
    * Pay attention to the precedence level of different rules.
    */
 
-  {" +", TK_NOTYPE},    // spaces
+  {"[ ]+", TK_NOTYPE},    // spaces
+  {"[0-9]+", TK_DIGIT}, // digits
   {"\\+", '+'},         // plus
+  {"-", '-'},           // minus
+  {"\\*", '*'},         // mul
+  {"/",   '/'},         // div
+  {"\\(", '('},         // left parentheses
+  {"\\)", ')'},         // right parentheses
   {"==", TK_EQ},        // equal
 };
 
@@ -67,7 +73,7 @@ typedef struct token {
   char str[32];
 } Token;
 
-static Token tokens[32] __attribute__((used)) = {};
+static Token tokens[65536] __attribute__((used)) = {};
 static int nr_token __attribute__((used))  = 0;
 
 static bool make_token(char *e) {
@@ -84,8 +90,7 @@ static bool make_token(char *e) {
         char *substr_start = e + position;
         int substr_len = pmatch.rm_eo;
 
-        Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s",
-            i, rules[i].regex, position, substr_len, substr_len, substr_start);
+        // Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s", i, rules[i].regex, position, substr_len, substr_len, substr_start);
 
         position += substr_len;
 
@@ -95,9 +100,25 @@ static bool make_token(char *e) {
          */
 
         switch (rules[i].token_type) {
-          default: TODO();
+          case '+':
+          case '-':
+          case '*':
+          case '/':
+          case '(':
+          case ')': tokens[nr_token++].type = rules[i].token_type; break;
+          case TK_DIGIT: tokens[nr_token].type = rules[i].token_type;
+            // in case buffer overflow
+            if (substr_len >= 32) {
+              assert(0);
+            }
+            strncpy(tokens[nr_token].str, substr_start, substr_len);
+            // strncpy don't fill the end null
+            tokens[nr_token++].str[substr_len] = '\0';
+            break;
+          default: break;
         }
 
+        assert(nr_token <= 65536);
         break;
       }
     }
@@ -111,6 +132,127 @@ static bool make_token(char *e) {
   return true;
 }
 
+bool matched(uint32_t p, uint32_t q) {
+  uint32_t cnt = 0;
+
+  // use counter as stack to match
+  for (uint32_t i = p; i <= q; i++) {
+    if (tokens[i].type == '(') {
+      cnt++;
+    } else if (tokens[i].type == ')' && cnt) {
+      cnt--;
+    } else if (tokens[i].type == ')' && !cnt) {
+      cnt = 1;
+      break;
+    } else {
+      continue;
+    }
+  }
+
+  if (cnt == 0)
+  { return true; }
+  else
+  { return false; }
+}
+
+bool check_parentheses(uint32_t p, uint32_t q, bool *success) {
+  uint32_t cnt = 0;
+
+  // dont begin and end with parentheses
+  bool not_surround = (tokens[p].type != '(' || tokens[q].type != ')');
+
+  // use counter as stack to match
+  for (uint32_t i = p; i <= q; i++) {
+    if (tokens[i].type == '(') {
+      cnt++;
+    } else if (tokens[i].type == ')' && cnt) {
+      cnt--;
+    } else if (tokens[i].type == ')' && !cnt) {
+      cnt = 1;
+      break;
+    } else {
+      continue;
+    }
+  }
+
+  // parentheses matched first(legal expression), then the left/right most parentheses matched
+  if (cnt == 0 && !not_surround && matched(p + 1, q - 1)) {
+    return true;
+  } else if (cnt != 0) {
+    *success = false;
+    return false;
+  } else {
+    return false;
+  }
+}
+
+bool is_operator(int ptr) {
+  int type = tokens[ptr].type;
+  return type == '+' || type == '-' || type == '*' || type == '/';
+}
+
+bool is_precedence(int op1, int op2) {
+  return (op1 == '*' || op1 == '/') && (op2 == '+' || op2 == '-');
+}
+
+int find_main_op(int p, int q) {
+  uint32_t in_parentheses = 0;
+  int ptr = 0;
+  int op = 0;
+
+  // scan from right to left(last calculate)
+  for (int i = q; i >= p; i--) {
+    int type = tokens[i].type;
+
+    // operator in nested parentheses can't be main op
+    if (type == ')') {
+      in_parentheses += 1;
+    } else if (type == '(') {
+      in_parentheses -= 1;
+    }
+
+    // lowest precedence
+    if (!is_operator(i) || in_parentheses) {
+      continue;
+    } else if (op == 0) {
+      op = type; ptr = i;
+    } else if (is_precedence(op, type)) {
+      op = type; ptr = i;
+    } else {
+      continue;
+    }
+  }
+
+  return ptr;
+}
+
+uint32_t eval(int p, int q, bool *success) {
+  if (p > q) {
+    assert(0);
+  } else if (p == q) {
+    // should be a digit
+    return strtoul(tokens[p].str, NULL, 0);
+  } else if (check_parentheses(p, q, success) == true) {
+    return eval(p + 1, q - 1, success);
+  } else {
+    // invalid expression
+    if (*success == false) {
+      return -1;
+    }
+    // calculate recursively
+    int op_pos = find_main_op(p, q);
+    uint32_t value1 = eval(p, op_pos - 1, success);
+    uint32_t value2 = eval(op_pos + 1, q, success);
+
+    switch (tokens[op_pos].type) {
+      case '+': return value1 + value2;
+      case '-': return value1 - value2;
+      case '*': return value1 * value2;
+      case '/': return value1 / value2;
+      default: assert(0);
+    }
+  }
+}
 
 word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -119,7 +261,34 @@ word_t expr(char *e, bool *success) {
   }
 
   /* TODO: Insert codes to evaluate the expression. */
-  TODO();
-
+  uint32_t value = eval(0, nr_token - 1, success);
+  if (*success) {
+    printf("%s=%u\n", e, value);
+  }
   return 0;
+}
+
+void calculator_test() {
+  FILE *fp = fopen("/home/rom/ysyx-workbench/nemu/tools/gen-expr/build/input", "r");
+  assert(fp != NULL);
+
+  char line[65536];
+  while (fgets(line, sizeof(line), fp) != NULL) {
+    // substitute \n with \0
+    line[strcspn(line, "\n")] = '\0';
+
+    // extract res and exp, exp may include space
+    char *res_str = strtok(line, " ");
+    char *exp = &line[strlen(res_str) +1];
+    if (res_str == NULL || exp == NULL) {
+      continue;
+    }
+
+    bool flag = true;
+    uint32_t res = strtoul(res_str, NULL, 0);
+    uint32_t value = expr(exp, &flag);
+
+    assert(res == value);
+  }
+  fclose(fp);
 }

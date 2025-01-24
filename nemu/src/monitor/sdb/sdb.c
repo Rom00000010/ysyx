@@ -95,7 +95,7 @@ static int cmd_x(char *args) {
 
   for (i = 0; i < num; i += 4) {
     // start address
-    printf("%s0x%x%s: ", ANSI_FG_BLUE, vaddr + 4 * i, ANSI_NONE );
+    printf("%s0x%x%s: ", ANSI_FG_BLUE, vaddr + 4 * i, ANSI_NONE);
     for (j = 0; j < 4; j++) {
       word_t value = vaddr_read(vaddr + 4 * i + 4 * j, 4);
       printf("0x%08x    ", value);
@@ -103,6 +103,14 @@ static int cmd_x(char *args) {
     printf("\n");
   }
 
+  return 0;
+}
+
+static int cmd_p(char *args) {
+  bool success=true;
+  expr(args, &success);
+  if(!success)
+    printf("illegal expression\n");
   return 0;
 }
 
@@ -119,6 +127,7 @@ static struct {
   { "si", "Step", cmd_si},
   { "info", "Info", cmd_info},
   { "x", "Scan memory", cmd_x},
+  { "p", "Print Expression", cmd_p},
   /* TODO: Add more commands */
 
 };
