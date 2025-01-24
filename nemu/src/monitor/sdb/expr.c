@@ -14,6 +14,7 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include "memory/vaddr.h"
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
@@ -21,10 +22,18 @@
 #include <regex.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ, TK_DIGIT,
+  TK_NOTYPE = 256, TK_EQ, TK_NEQ, TK_AND, TK_DIGIT, TK_HEX, TK_IDENTIFIER, TK_DEREF,
 
   /* TODO: Add more token types */
 
+};
+
+int precedence[] = {
+  [TK_DEREF] = 3,
+  ['+'] = 1, ['-'] = 1,
+  ['*'] = 2, ['/'] = 2,
+  [TK_EQ] = 0, [TK_NEQ] = 0,
+  [TK_AND] = -1,
 };
 
 static struct rule {
@@ -36,14 +45,18 @@ static struct rule {
    * Pay attention to the precedence level of different rules.
    */
 
-  {"[ ]+", TK_NOTYPE},    // spaces
+  {"[ ]+", TK_NOTYPE},  // spaces
+  {"0x[0-9a-fA-F]+", TK_HEX}, // hex
   {"[0-9]+", TK_DIGIT}, // digits
+  {"[0-9strfpa$]{3}", TK_IDENTIFIER}, // identifier
   {"\\+", '+'},         // plus
   {"-", '-'},           // minus
-  {"\\*", '*'},         // mul
+  {"\\*", '*'},         // mul or deref
   {"/",   '/'},         // div
   {"\\(", '('},         // left parentheses
   {"\\)", ')'},         // right parentheses
+  {"!=", TK_NEQ},       // not equal
+  {"&&", TK_AND},       // logical and
   {"==", TK_EQ},        // equal
 };
 
@@ -100,12 +113,17 @@ static bool make_token(char *e) {
          */
 
         switch (rules[i].token_type) {
+          case TK_EQ:
+          case TK_NEQ:
+          case TK_AND:
           case '+':
           case '-':
           case '*':
           case '/':
           case '(':
           case ')': tokens[nr_token++].type = rules[i].token_type; break;
+          case TK_IDENTIFIER:
+          case TK_HEX:
           case TK_DIGIT: tokens[nr_token].type = rules[i].token_type;
             // in case buffer overflow
             if (substr_len >= 32) {
@@ -132,11 +150,12 @@ static bool make_token(char *e) {
   return true;
 }
 
+// whether parentheses is matched 
 bool matched(uint32_t p, uint32_t q) {
   uint32_t cnt = 0;
 
   // use counter as stack to match
-  for (uint32_t i = p; i <= q; i++) {
+  for (int i = p; i <= q; i++) {
     if (tokens[i].type == '(') {
       cnt++;
     } else if (tokens[i].type == ')' && cnt) {
@@ -149,12 +168,15 @@ bool matched(uint32_t p, uint32_t q) {
     }
   }
 
-  if (cnt == 0)
-  { return true; }
-  else
-  { return false; }
+  // traverse through all char and stack is empty
+  if (cnt == 0){
+    return true; 
+  }else{ 
+    return false; 
+  }
 }
 
+// expression like (exp), use alg from manual
 bool check_parentheses(uint32_t p, uint32_t q, bool *success) {
   uint32_t cnt = 0;
 
@@ -162,7 +184,7 @@ bool check_parentheses(uint32_t p, uint32_t q, bool *success) {
   bool not_surround = (tokens[p].type != '(' || tokens[q].type != ')');
 
   // use counter as stack to match
-  for (uint32_t i = p; i <= q; i++) {
+  for (int i = p; i <= q; i++) {
     if (tokens[i].type == '(') {
       cnt++;
     } else if (tokens[i].type == ')' && cnt) {
@@ -188,11 +210,12 @@ bool check_parentheses(uint32_t p, uint32_t q, bool *success) {
 
 bool is_operator(int ptr) {
   int type = tokens[ptr].type;
-  return type == '+' || type == '-' || type == '*' || type == '/';
+  return type == '+' || type == '-' || type == '*' || type == '/'\
+  || type == TK_EQ || type == TK_NEQ || type == TK_AND || type == TK_DEREF;
 }
 
 bool is_precedence(int op1, int op2) {
-  return (op1 == '*' || op1 == '/') && (op2 == '+' || op2 == '-');
+  return precedence[op1] > precedence[op2];
 }
 
 int find_main_op(int p, int q) {
@@ -230,8 +253,14 @@ uint32_t eval(int p, int q, bool *success) {
   if (p > q) {
     assert(0);
   } else if (p == q) {
-    // should be a digit
-    return strtoul(tokens[p].str, NULL, 0);
+    // should be a decimal/ hex digit, or a register
+    int type = tokens[p].type;
+    assert(type==TK_IDENTIFIER || type == TK_DIGIT || type == TK_HEX);
+    if (type == TK_IDENTIFIER) {
+      return isa_reg_str2val(&tokens[p].str[1], success);
+    } else {
+      return strtoul(tokens[p].str, NULL, 0);
+    }
   } else if (check_parentheses(p, q, success) == true) {
     return eval(p + 1, q - 1, success);
   } else {
@@ -239,9 +268,12 @@ uint32_t eval(int p, int q, bool *success) {
     if (*success == false) {
       return -1;
     }
-    // calculate recursively
+    // calculate recursively according to unary/binary op 
     int op_pos = find_main_op(p, q);
-    uint32_t value1 = eval(p, op_pos - 1, success);
+    uint32_t value1 = 0;
+    if (tokens[op_pos].type != TK_DEREF) {
+      value1 = eval(p, op_pos - 1, success);
+    }
     uint32_t value2 = eval(op_pos + 1, q, success);
 
     switch (tokens[op_pos].type) {
@@ -249,9 +281,22 @@ uint32_t eval(int p, int q, bool *success) {
       case '-': return value1 - value2;
       case '*': return value1 * value2;
       case '/': return value1 / value2;
+      case TK_EQ: return value1 == value2;
+      case TK_NEQ: return value1 != value2;
+      case TK_AND: return value1 && value2;
+      case TK_DEREF:  // read 4 bytes from memory
+        vaddr_t vaddr = value2;
+        word_t value = vaddr_read(vaddr, 4);
+        return value;
       default: assert(0);
     }
   }
+}
+
+bool is_deref(int ptr) {
+  int type = tokens[ptr].type;
+  return type == '+' || type == '-' || type == '*' || type == '/'\
+  || type == TK_EQ || type == TK_NEQ || type == TK_AND || type == '(';
 }
 
 word_t expr(char *e, bool *success) {
@@ -260,11 +305,19 @@ word_t expr(char *e, bool *success) {
     return 0;
   }
 
+  // seperate deref from multiply
+  for (int i = 0; i < nr_token; i++) {
+    if (tokens[i].type == '*' && (i == 0 || is_deref(i-1))) {
+      tokens[i].type = TK_DEREF;
+    }
+  }
+
   /* TODO: Insert codes to evaluate the expression. */
   uint32_t value = eval(0, nr_token - 1, success);
   if (*success) {
     printf("%s=%u\n", e, value);
   }
+  // return value; //for test calculator
   return 0;
 }
 
