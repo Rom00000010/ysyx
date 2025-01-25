@@ -31,6 +31,10 @@ static uint64_t g_timer = 0; // unit: us
 static bool g_print_step = false;
 
 void device_update();
+uint32_t scan_watchpoints(bool *success);
+uint32_t watchpoint_val();
+int watchpoint_no();
+char *watchpoint_exp();
 
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE_COND
@@ -38,6 +42,20 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
   IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));
+
+#ifdef CONFIG_WATCHPOINT
+  bool triggered=false;
+  uint32_t old_val=scan_watchpoints(&triggered);
+  if(triggered){
+    // indirect read value from static variable
+    uint32_t new_val=watchpoint_val();
+    int no = watchpoint_no();
+    char *exp = watchpoint_exp();
+    printf("watchpoint %d: %s\n\n", no, exp);
+    printf("old value: %u/0x%x\nnew value: %u/0x%x\n", old_val, old_val, new_val, new_val);
+    nemu_state.state = NEMU_STOP;
+  }
+#endif
 }
 
 static void exec_once(Decode *s, vaddr_t pc) {

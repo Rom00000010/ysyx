@@ -24,6 +24,9 @@ static int is_batch_mode = false;
 
 void init_regex();
 void init_wp_pool();
+void new_wp(char *exp, uint32_t val);
+void watchpoint_display();
+int delete_watchpoint();
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 static char *rl_gets() {
@@ -78,7 +81,8 @@ static int cmd_info(char *args) {
   if (strcmp(arg, "r") == 0) {
     isa_reg_display();
   } else {
-    // TODO for w
+    assert(strcmp(arg, "w") == 0);
+    watchpoint_display();
   }
   return 0;
 }
@@ -107,10 +111,36 @@ static int cmd_x(char *args) {
 }
 
 static int cmd_p(char *args) {
-  bool success=true;
-  expr(args, &success);
-  if(!success)
-    printf("illegal expression\n");
+  bool success = true;
+  uint32_t val = expr(args, &success);
+  if (!success){
+    printf("illegal expression\n"); 
+  }else{
+    printf("%s = %d/0x%x\n", args, val, val);
+  }
+  return 0;
+}
+
+static int cmd_w(char *args) {
+#ifndef CONFIG_WATCHPOINT
+  printf("Watchpoint is not enabled\n");
+  return 0;
+#endif
+
+  bool success = true;
+  uint32_t init_val = expr(args, &success);
+  if (success) {
+    printf("add watchpoint\n");
+    new_wp(args, init_val);
+  }
+  return 0;
+}
+
+static int cmd_d(char *arg) {
+  int no = strtoul(arg, NULL, 0);
+  if (delete_watchpoint(no)) {
+    printf("delete watchpoint %d\n", no);
+  }
   return 0;
 }
 
@@ -128,6 +158,8 @@ static struct {
   { "info", "Info", cmd_info},
   { "x", "Scan memory", cmd_x},
   { "p", "Print Expression", cmd_p},
+  { "w", "Watchpoint", cmd_w},
+  { "d", "Delete watchpoint", cmd_d},
   /* TODO: Add more commands */
 
 };

@@ -48,7 +48,7 @@ static struct rule {
   {"[ ]+", TK_NOTYPE},  // spaces
   {"0x[0-9a-fA-F]+", TK_HEX}, // hex
   {"[0-9]+", TK_DIGIT}, // digits
-  {"[0-9strfpa$]{3}", TK_IDENTIFIER}, // identifier
+  {"[0-9cstrfpa$]{3}", TK_IDENTIFIER}, // identifier
   {"\\+", '+'},         // plus
   {"-", '-'},           // minus
   {"\\*", '*'},         // mul or deref
@@ -314,11 +314,7 @@ word_t expr(char *e, bool *success) {
 
   /* TODO: Insert codes to evaluate the expression. */
   uint32_t value = eval(0, nr_token - 1, success);
-  if (*success) {
-    printf("%s=%u\n", e, value);
-  }
-  // return value; //for test calculator
-  return 0;
+  return value;
 }
 
 void calculator_test() {

@@ -178,6 +178,13 @@ config DIFFTEST_REF_KVM
 endif
 endchoice
 
+config WATCHPOINT
+  bool "Enable watchpoint detection"
+  default n
+  help
+    Enable watchpoint detection(w command).
+    Can bring explicitly overhead.
+
 config DIFFTEST_REF_PATH
   string
   default "tools/qemu-diff" if DIFFTEST_REF_QEMU
@@ -191,6 +198,7 @@ config DIFFTEST_REF_NAME
   default "kvm" if DIFFTEST_REF_KVM
   default "spike" if DIFFTEST_REF_SPIKE
   default "none"
+
 endmenu
 
 if MODE_SYSTEM
