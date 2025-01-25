@@ -89,22 +89,25 @@ static int cmd_info(char *args) {
 
 static int cmd_x(char *args) {
   int i, j;
+  bool success = true;
   // extract number and Expr
   char *num_str = strtok(NULL, " ");
-  char *expr = strtok(NULL, " ");
+  char *exp = &args[strlen(num_str) +1];
   uint64_t num = strtoull(num_str, NULL, 0);
 
   // expression evaluation(decimal or hex direct addr)
-  vaddr_t vaddr = strtoul(expr, NULL, 0);
+  vaddr_t vaddr = expr(exp, &success);
 
-  for (i = 0; i < num; i += 4) {
-    // start address
-    printf("%s0x%x%s: ", ANSI_FG_BLUE, vaddr + 4 * i, ANSI_NONE);
-    for (j = 0; j < 4; j++) {
-      word_t value = vaddr_read(vaddr + 4 * i + 4 * j, 4);
-      printf("0x%08x    ", value);
+  if (success) {
+    for (i = 0; i < num; i += 4) {
+      // start address
+      printf("%s0x%x%s: ", ANSI_FG_BLUE, vaddr + 4 * i, ANSI_NONE);
+      for (j = 0; j < 4; j++) {
+        word_t value = vaddr_read(vaddr + 4 * i + 4 * j, 4);
+        printf("0x%08x    ", value);
+      }
+      printf("\n");
     }
-    printf("\n");
   }
 
   return 0;
@@ -113,9 +116,9 @@ static int cmd_x(char *args) {
 static int cmd_p(char *args) {
   bool success = true;
   uint32_t val = expr(args, &success);
-  if (!success){
-    printf("illegal expression\n"); 
-  }else{
+  if (!success) {
+    printf("illegal expression\n");
+  } else {
     printf("%s = %d/0x%x\n", args, val, val);
   }
   return 0;
@@ -154,11 +157,11 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-  { "si", "Step", cmd_si},
-  { "info", "Info", cmd_info},
-  { "x", "Scan memory", cmd_x},
-  { "p", "Print Expression", cmd_p},
-  { "w", "Watchpoint", cmd_w},
+  { "si", "Exec N(1) Step instructions", cmd_si},
+  { "info", "Register/watchpoint Info", cmd_info},
+  { "x", "Scan memory at [exp, exp+N*4]", cmd_x},
+  { "p", "Print value of Expression", cmd_p},
+  { "w", "Add atchpoint", cmd_w},
   { "d", "Delete watchpoint", cmd_d},
   /* TODO: Add more commands */
 

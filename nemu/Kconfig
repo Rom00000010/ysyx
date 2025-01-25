@@ -118,9 +118,9 @@ config CC_DEBUG
   bool "Enable debug information"
   default n
 
-config CC_ASAN
+config CC_SAN
   depends on MODE_SYSTEM
-  bool "Enable address sanitizer"
+  bool "Enable sanitizer(addr, undef, leak)"
   default n
 endmenu
 
