@@ -25,7 +25,6 @@ module keyboard_handler(
                         if(data != 8'hF0)
                             cnt <= cnt + 1'b1;
                     end
-
                 end
                 nextdata_n <= 0;
             end
