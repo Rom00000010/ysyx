@@ -1,12 +1,13 @@
 `timescale 1ns / 1ps
 
-module test_random;
+module test_random
+;
     reg clk;
     reg reset;
     reg [7:0] seed;
     wire [7:0] random_value;  // Changed to wire to connect to the module output
 
-    random dut(
+    linear_shift dut(
         .clk(clk),
         .reset(reset),
         .seed(seed),

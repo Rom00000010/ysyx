@@ -1,7 +1,7 @@
 `timescale 1ns / 1ns
 module ps2_keyboard_controller(clk,clrn,ps2_clk,ps2_data,data,
                     ready,nextdata_n,overflow);
-    input clk,clrn,ps2_clk,ps2_data;
+    input clk,clrn,ps2_clk,ps2_data;  
     input nextdata_n;
     output [7:0] data;
     output reg ready;

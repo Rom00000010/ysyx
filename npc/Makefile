@@ -4,7 +4,7 @@ INC_PATH ?=
 
 VERILATOR = verilator
 VERILATOR_CFLAGS += -MMD --build -cc  \
-				-O3 --x-assign fast --x-initial fast --noassert
+				-O3 --x-assign fast --x-initial fast --noassert --timing
 
 BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir
@@ -50,7 +50,7 @@ clean:
 
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	verilator --cc --exe --build --trace --timing -j 0 -Wall -I./vsrc ./csrc/vmain.cpp ./vsrc/top.v
+	verilator --cc --exe --build --trace --timing -j 0 -Wall -I./vsrc ./csrc/vmain.cpp ./vsrc/top.v 
 
 include ../Makefile
 

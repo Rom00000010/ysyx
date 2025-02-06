@@ -14,3 +14,4 @@ module bcd7seg(input [2:0] bcd,
             default: seg = ~7'b000_0000;
         endcase
 endmodule
+  
