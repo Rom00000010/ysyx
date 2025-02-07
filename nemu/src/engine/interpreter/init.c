@@ -14,10 +14,17 @@
 ***************************************************************************************/
 
 #include <cpu/cpu.h>
+#include <cpu/iringbuf.h>
+
+CircularBuffer iringbuf;
 
 void sdb_mainloop();
 
 void engine_start() {
+#ifdef CONFIG_ITRACE
+ initBuffer(&iringbuf);
+#endif
+
 #ifdef CONFIG_TARGET_AM
   cpu_exec(-1);
 #else
