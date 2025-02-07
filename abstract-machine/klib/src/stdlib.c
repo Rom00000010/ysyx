@@ -29,6 +29,46 @@ int atoi(const char* nptr) {
   return x;
 }
 
+char *to_string(int val, char *str) {
+    
+    // value equals to zero
+    if (val == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return str;
+    }
+
+    // handle non-negative part
+    int sign = (val < 0) ? -1 : 1;
+    if (sign == -1) {
+        val = -val;
+    }
+
+    int i = 0;
+    while (val > 0) {
+        int digit = val % 10;
+        val /= 10;
+        str[i++] = (char)('0' + digit);
+    }
+
+    // add sign and terminate
+    if (sign == -1) {
+        str[i++] = '-';
+    }
+
+    str[i] = '\0';
+
+    // reverse
+    for (int j = 0, k = i - 1; j < k; j++, k--) {
+        char tmp = str[j];
+        str[j] = str[k];
+        str[k] = tmp;
+    }
+
+    return str;
+}
+
+
 void *malloc(size_t size) {
   // On native, malloc() will be called during initializaion of C runtime.
   // Therefore do not call panic() here, else it will yield a dead recursion:
