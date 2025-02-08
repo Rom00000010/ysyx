@@ -23,11 +23,15 @@
 #define Mr vaddr_read
 #define Mw vaddr_write
 
+const char *func_name(vaddr_t addr);
+
 enum {
   TYPE_I, TYPE_U, TYPE_S,
   TYPE_B, TYPE_J, TYPE_R,
   TYPE_N,// none
 };
+
+static int rs1, rs2;
 
 #define src1R() do { *src1 = R(rs1); } while (0)
 #define src2R() do { *src2 = R(rs2); } while (0)
@@ -44,8 +48,8 @@ enum {
 
 static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_t *imm, int type) {
   uint32_t i = s->isa.inst;
-  int rs1 = BITS(i, 19, 15);
-  int rs2 = BITS(i, 24, 20);
+  rs1 = BITS(i, 19, 15);
+  rs2 = BITS(i, 24, 20);
   *rd     = BITS(i, 11, 7);
   switch (type) {
     case TYPE_I: src1R();          immI(); break;
@@ -61,6 +65,7 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_
 
 static int decode_exec(Decode *s) {
   s->dnpc = s->snpc;
+  static int depth = 0;
 
 #define INSTPAT_INST(s) ((s)->isa.inst)
 #define INSTPAT_MATCH(s, name, type, ... /* execute body */ ) { \
@@ -80,6 +85,7 @@ static int decode_exec(Decode *s) {
   INSTPAT("0000000 ????? ????? 100 ????? 01100 11", xor, R, R(rd) = src1 ^ src2);
   INSTPAT("0000001 ????? ????? 000 ????? 01100 11", mul, R, {int x1 = src1, x2 = src2; R(rd) = (int64_t)x1 * (int64_t)x2;});
   INSTPAT("0000001 ????? ????? 001 ????? 01100 11", mulh, R, {int x1 = src1, x2 = src2; long long product = (long long)x1 * (long long)x2; R(rd) = product >> 32;});
+  INSTPAT("0000001 ????? ????? 011 ????? 01100 11", mulhu, R, {uint64_t product = (uint64_t)src1 * (uint64_t)src2; R(rd) = product >> 32;});
   INSTPAT("0000001 ????? ????? 100 ????? 01100 11", div, R, R(rd) = (int32_t)src1 / (int32_t)src2);
   INSTPAT("0000001 ????? ????? 101 ????? 01100 11", divu, R, R(rd) = src1 / src2);
 
@@ -102,8 +108,42 @@ static int decode_exec(Decode *s) {
   INSTPAT("??????? ????? ????? 001 ????? 01000 11", sh, S, Mw(src1 + imm, 2, src2));
   INSTPAT("??????? ????? ????? 000 ????? 01000 11", sb, S, Mw(src1 + imm, 1, src2));
 
-  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, {R(rd) = s->pc + 4; s->dnpc = s->pc + imm;});
-  INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, {R(rd) = s->pc + 4; s->dnpc = (src1 + imm) & ~1;});
+  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, {
+      R(rd) = s->pc + 4; s->dnpc = s->pc + imm;
+      const char *target_name = func_name(s->dnpc);
+      if(rd == 1 || rd == 5){
+        // call
+        printf("0x%x: ", s->pc);
+        for(int i=0;i<depth;i++){
+          printf("  ");
+        }
+        printf("call [%s@0x%x]\n", target_name, s->dnpc);
+        depth++;
+      }
+      });
+  INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, {
+      R(rd) = s->pc + 4; s->dnpc = (src1 + imm) & ~1;
+      const char *name = func_name(cpu.pc);
+      const char *target_name = func_name(s->dnpc);
+      if(rd == 0 && imm == 0 && (rs1 == 1 || rs1 == 5)){
+        // ret
+        depth--;
+        Assert(depth>=0, "ftrace error");
+        printf("0x%x: ", s->pc);
+        for(int i=0;i<depth;i++){
+          printf("  ");
+        }
+        printf("ret  [%s]\n", name);       
+      } else if(rd == 1 || rd == 5){
+        // call
+        printf("0x%x: ", s->pc);
+        for(int i=0;i<depth;i++){
+          printf("  ");
+        }
+        printf("call [%s@0x%x]\n", target_name, s->dnpc);
+        depth++;
+      }
+      });
 
   INSTPAT("??????? ????? ????? 000 ????? 11000 11", beq, B, {if (src1 == src2) s->dnpc = s->pc + imm; });
   INSTPAT("??????? ????? ????? 001 ????? 11000 11", bne, B, {if (src1 != src2) s->dnpc = s->pc + imm; });
