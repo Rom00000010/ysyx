@@ -4,23 +4,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <vector>
 #include <cstdint>
 #include <cstring>
+#include <capstone/capstone.h>
 #include "svdpi.h"
 #include "Vtop__Dpi.h"
+
+#define CONFIG_WATCHPOINT
 
 using namespace std;
 
 VerilatedContext *contextp = NULL;
 VerilatedVcdC *tfp = NULL;
-static Vtop *top;
+Vtop *top;
 
 vluint64_t sim_time = 0;
 bool finish = false;
+bool stop = false;
 
 vector<uint32_t> mem(1024 * 1024);
+extern "C" void print_rf();
+void sdb_mainloop();
+void calculator_test();
+void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
+uint32_t scan_watchpoints(bool *success);
+uint32_t watchpoint_val();
+int watchpoint_no();
+char *watchpoint_exp();
 
 void set_finish()
 {
@@ -46,15 +59,22 @@ uint32_t pmem_read(uint32_t addr)
     return 0;
 }
 
-void step_and_dump_wave()
+void step_and_dump_wave(unsigned int n)
 {
-    top->clk ^= 1;
-    top->eval();
+    while (n--)
+    {
+        if (finish)
+            break;
+        top->clk ^= 1;
+        top->eval();
 
-    if (top->clk == 1)
-        top->instr = pmem_read(top->pc_val);
-    sim_time++;
-    tfp->dump(sim_time);
+        if (top->clk == 1)
+        {
+            top->instr = pmem_read(top->pc_val);
+        }
+        sim_time++;
+        tfp->dump(sim_time);
+    }
 }
 
 void sim_init()
@@ -66,6 +86,16 @@ void sim_init()
     top = new Vtop;
     top->trace(tfp, 99);
     tfp->open("dump.vcd");
+
+    const svScope scope = svGetScopeFromName("TOP.top.regfile");
+    if (!scope)
+    {
+        std::cerr << "Failed to get scope for regfile" << std::endl;
+    }
+    else
+    {
+        svSetScope(scope);
+    }
 }
 
 void single_cycle()
@@ -91,48 +121,90 @@ void reset(int n)
     top->instr = pmem_read(top->pc_val);
 }
 
-void img_init(int argc, char **argv)
+void disassembleAndPrint(uint32_t inst)
 {
-    // get image path
-    if (argc < 2)
+    // 初始化 Capstone 反汇编器（以 RISC-V 32 位为例）
+    csh handle;
+    if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV32, &handle) != CS_ERR_OK)
     {
-        cerr << "Usage: " << argv[0] << " <image_file>" << endl;
-        exit(1);
-    }
-    string filename = argv[1];
-
-    // open in binary mode
-    ifstream file(filename, ios::binary);
-    if (!file)
-    {
-        cerr << "Error opening file: " << filename << endl;
-        exit(1);
+        std::cerr << "ERROR: Failed to initialize Capstone disassembler" << std::endl;
+        return;
     }
 
-    // use istreambuf_iterator read complete content
-    vector<unsigned char> buffer((istreambuf_iterator<char>(file)),
-                                 istreambuf_iterator<char>());
-    file.close();
+    // 将 uint32_t 指令转换为字节数组（注意字节序，通常为小端）
+    uint8_t code[4];
+    std::memcpy(code, &inst, sizeof(inst));
 
-    if (buffer.size() % 4 != 0)
+    // 反汇编此 4 字节的代码，从地址 0 开始（地址仅用于显示）
+    cs_insn *insn = nullptr;
+    size_t count = cs_disasm(handle, code, sizeof(code), 0x0, 0, &insn);
+    if (count > 0)
     {
-        cerr << "Error: Image size is not a multiple of 4 bytes." << endl;
-        exit(1);
+        // 打印反汇编结果（理论上 count 应为 1）
+        for (size_t i = 0; i < count; i++)
+        {
+            std::cout << insn[i].mnemonic << "\t" << insn[i].op_str << std::endl;
+        }
+        cs_free(insn, count);
+    }
+    else
+    {
+        std::cerr << "ERROR: Failed to disassemble the given instruction" << std::endl;
     }
 
-    memcpy(mem.data(), buffer.data(), buffer.size());
+    cs_close(&handle);
+}
+
+void watchpoint_inspect()
+{
+#ifdef CONFIG_WATCHPOINT
+    bool triggered = false;
+    uint32_t old_val = scan_watchpoints(&triggered);
+    if (triggered)
+    {
+        // indirect read value from static variable
+        uint32_t new_val = watchpoint_val();
+        int no = watchpoint_no();
+        char *exp = watchpoint_exp();
+        printf("watchpoint %d: %s\n\n", no, exp);
+        printf("old value: %u/0x%x\nnew value: %u/0x%x\n", old_val, old_val, new_val, new_val);
+        stop = true;
+    }
+#endif
+}
+
+void cpu_exec(unsigned int n)
+{
+    unsigned int cnt = n;
+    while (!finish && cnt-- &&!stop)
+    {
+        if (n <= 10)
+        {
+            cout << "0x"
+                 << setw(8)
+                 << setfill('0')
+                 << hex
+                 << top->pc_val << ": ";
+            cout << setw(8)
+                 << setfill('0')
+                 << hex
+                 << top->instr << " ";
+            disassembleAndPrint(top->instr);
+        }
+        step_and_dump_wave(2);
+        watchpoint_inspect();
+    }
 }
 
 int main(int argc, char **argv)
 {
     sim_init();
 
-    img_init(argc, argv);
+    init_monitor(argc, argv, mem);
 
     reset(5);
 
-    while (!finish)
-        step_and_dump_wave();
+    sdb_mainloop();
 
     tfp->close();
     return 0;
