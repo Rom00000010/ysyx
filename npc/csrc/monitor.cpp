@@ -2,12 +2,15 @@
 #include <fstream>
 #include <vector>
 #include <stdlib.h>
+#include <iringbuf.h>
 #include <string>
 #include <string.h>
 #include <cstdint>
 using namespace std;
 
 void init_sdb();
+
+void init_elf(const char *elf_file);
 
 void img_init(int argc, char **argv, vector <uint32_t> &mem)
 {
@@ -46,4 +49,8 @@ void init_monitor(int argc, char **argv, vector <uint32_t> &mem)
     img_init(argc, argv, mem);
 
     init_sdb();
+
+    initBuffer();
+
+    init_elf(argv[2]);
 }

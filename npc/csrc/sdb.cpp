@@ -3,13 +3,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <macro.h>
 #include <stdint.h>
+#include <iostream>
 #include <assert.h>
 #include "svdpi.h"
 #include "Vtop__Dpi.h"
 
 extern "C" void print_rf();
-#define ARRLEN(arr) (int)(sizeof(arr) / sizeof(arr[0]))
 #define CONFIG_WATCHPOINT
 
 bool is_batch_mode = false;
@@ -50,6 +51,15 @@ static int cmd_info(char *args)
 
   if (strcmp(arg, "r") == 0)
   {
+    const svScope scope = svGetScopeFromName("TOP.top.regfile");
+    if (!scope)
+    {
+      std::cerr << "Failed to get scope for regfile" << std::endl;
+    }
+    else
+    {
+      svSetScope(scope);
+    }
     print_rf();
   }
   else
@@ -94,33 +104,41 @@ static int cmd_si(char *args)
 
 static int cmd_help(char *args);
 
-static int cmd_p(char *args) {
+static int cmd_p(char *args)
+{
   bool success = true;
   uint32_t val = expr(args, &success);
-  if (!success) {
+  if (!success)
+  {
     printf("illegal expression\n");
-  } else {
+  }
+  else
+  {
     printf("%s = %d/0x%x\n", args, val, val);
   }
   return 0;
 }
 
-static int cmd_x(char *args) {
+static int cmd_x(char *args)
+{
   int i, j;
   bool success = true;
   // extract number and Expr
   char *num_str = strtok(NULL, " ");
-  char *exp = &args[strlen(num_str) +1];
+  char *exp = &args[strlen(num_str) + 1];
   uint64_t num = strtoull(num_str, NULL, 0);
 
   // expression evaluation(decimal or hex direct addr)
   uint32_t vaddr = expr(exp, &success);
 
-  if (success) {
-    for (i = 0; i < num; i += 4) {
+  if (success)
+  {
+    for (i = 0; i < num; i += 4)
+    {
       // start address
       printf("\033[34m0x%x\033[0m: ", vaddr + 4 * i);
-      for (j = 0; j < 4; j++) {
+      for (j = 0; j < 4; j++)
+      {
         uint32_t value = pmem_read(vaddr + 4 * i + 4 * j);
         printf("0x%08x    ", value);
       }
@@ -131,7 +149,8 @@ static int cmd_x(char *args) {
   return 0;
 }
 
-static int cmd_w(char *args) {
+static int cmd_w(char *args)
+{
 #ifndef CONFIG_WATCHPOINT
   printf("Watchpoint is not enabled\n");
   return 0;
@@ -139,21 +158,23 @@ static int cmd_w(char *args) {
 
   bool success = true;
   uint32_t init_val = expr(args, &success);
-  if (success) {
+  if (success)
+  {
     printf("add watchpoint\n");
     new_wp(args, init_val);
   }
   return 0;
 }
 
-static int cmd_d(char *arg) {
+static int cmd_d(char *arg)
+{
   int no = strtoul(arg, NULL, 0);
-  if (delete_watchpoint(no)) {
+  if (delete_watchpoint(no))
+  {
     printf("delete watchpoint %d\n", no);
   }
   return 0;
 }
-
 
 static struct
 {
@@ -165,11 +186,11 @@ static struct
     {"c", "Continue the execution of the program", cmd_c},
     {"q", "Exit NEMU", cmd_q},
     {"si", "Exec N(1) Step instructions", cmd_si},
-    { "info", "Register/watchpoint Info", cmd_info},
-    { "x", "Scan memory at [exp, exp+N*4]", cmd_x},
-    { "p", "Print value of Expression", cmd_p},
-    { "w", "Add atchpoint", cmd_w},
-    { "d", "Delete watchpoint", cmd_d},
+    {"info", "Register/watchpoint Info", cmd_info},
+    {"x", "Scan memory at [exp, exp+N*4]", cmd_x},
+    {"p", "Print value of Expression", cmd_p},
+    {"w", "Add atchpoint", cmd_w},
+    {"d", "Delete watchpoint", cmd_d},
     /* TODO: Add more commands */
 
 };
@@ -212,8 +233,8 @@ void sdb_mainloop()
     return;
   }
   for (char *str; (str = rl_gets()) != NULL;)
-  { 
-    stop=false;
+  {
+    stop = false;
     char *str_end = str + strlen(str);
 
     /* extract the first token as the command */
@@ -257,7 +278,8 @@ void sdb_mainloop()
   }
 }
 
-void init_sdb() {
+void init_sdb()
+{
   /* Compile the regular expressions. */
   init_regex();
 

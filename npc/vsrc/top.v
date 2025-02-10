@@ -78,5 +78,10 @@ module top (
     assign dnpc = jalr ? (data_reg1 + ext_imm)&~1 : pc_val + ext_imm;
     assign nextpc = branch? dnpc : snpc;
 
+    function automatic int get_dnpc();
+        get_dnpc = dnpc;
+    endfunction
+
+    export "DPI-C" function get_dnpc;
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

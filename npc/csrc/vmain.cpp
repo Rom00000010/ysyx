@@ -6,14 +6,17 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <macro.h>
 #include <vector>
 #include <cstdint>
 #include <cstring>
 #include <capstone/capstone.h>
+#include <iringbuf.h>
 #include "svdpi.h"
 #include "Vtop__Dpi.h"
 
 #define CONFIG_WATCHPOINT
+#define CONFIG_FTRACE
 
 using namespace std;
 
@@ -22,11 +25,13 @@ VerilatedVcdC *tfp = NULL;
 Vtop *top;
 
 vluint64_t sim_time = 0;
+int depth = 0;
 bool finish = false;
 bool stop = false;
 
 vector<uint32_t> mem(1024 * 1024);
 extern "C" void print_rf();
+extern "C" int get_dnpc();
 void sdb_mainloop();
 void calculator_test();
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
@@ -34,6 +39,8 @@ uint32_t scan_watchpoints(bool *success);
 uint32_t watchpoint_val();
 int watchpoint_no();
 char *watchpoint_exp();
+const char *func_name(uint32_t addr);
+void ftrace(uint32_t pc, uint32_t instr);
 
 void set_finish()
 {
@@ -45,6 +52,7 @@ void set_finish()
     else
     {
         cout << "\033[1;31m" << "HIT BAD TRAP" << "\033[0m" << endl;
+        printBuffer();
         exit(1);
     }
 }
@@ -72,6 +80,10 @@ void step_and_dump_wave(unsigned int n)
         {
             top->instr = pmem_read(top->pc_val);
         }
+        else 
+        {
+            ftrace(top->pc_val, top->instr);
+        }
         sim_time++;
         tfp->dump(sim_time);
     }
@@ -86,16 +98,6 @@ void sim_init()
     top = new Vtop;
     top->trace(tfp, 99);
     tfp->open("dump.vcd");
-
-    const svScope scope = svGetScopeFromName("TOP.top.regfile");
-    if (!scope)
-    {
-        std::cerr << "Failed to get scope for regfile" << std::endl;
-    }
-    else
-    {
-        svSetScope(scope);
-    }
 }
 
 void single_cycle()
@@ -121,7 +123,7 @@ void reset(int n)
     top->instr = pmem_read(top->pc_val);
 }
 
-void disassembleAndPrint(uint32_t inst)
+void disassembleAndPrint(uint32_t inst, char *buf, bool flag)
 {
     // 初始化 Capstone 反汇编器（以 RISC-V 32 位为例）
     csh handle;
@@ -143,7 +145,14 @@ void disassembleAndPrint(uint32_t inst)
         // 打印反汇编结果（理论上 count 应为 1）
         for (size_t i = 0; i < count; i++)
         {
-            std::cout << insn[i].mnemonic << "\t" << insn[i].op_str << std::endl;
+            if (flag)
+                std::cout << insn[i].mnemonic << "\t" << insn[i].op_str << std::endl;
+            else
+            {
+                strcat(buf, insn[i].mnemonic);
+                strcat(buf, "\t");
+                strcat(buf, insn[i].op_str);
+            }
         }
         cs_free(insn, count);
     }
@@ -173,10 +182,73 @@ void watchpoint_inspect()
 #endif
 }
 
+void ftrace(uint32_t pc, uint32_t instr)
+{
+    const svScope scope = svGetScopeFromName("TOP.top");
+    if (!scope)
+    {
+        std::cerr << "Failed to get scope for top" << std::endl;
+    }
+    else
+    {
+        svSetScope(scope);
+    }
+#ifdef CONFIG_FTRACE
+    const char *name = func_name(pc);
+    const char *target_name = func_name(get_dnpc());
+    int rs1 = BITS(instr, 19, 15);
+    int rs2 = BITS(instr, 24, 20);
+    int rd = BITS(instr, 11, 7);
+    int imm = BITS(instr, 31, 20);
+    if (BITS(instr, 6, 0) == 0b1100111)
+    {
+        if (rd == 0 && imm == 0 && (rs1 == 1 || rs1 == 5))
+        {
+            // ret
+            depth--;
+            assert(depth >= 0);
+            printf("0x%x: ", pc);
+            for (int i = 0; i < depth; i++)
+            {
+                printf("  ");
+            }
+            printf("ret  [%s]\n", name);
+        }
+        else if (rd == 1 || rd == 5)
+        {
+            // call
+            printf("0x%x: ", pc);
+            for (int i = 0; i < depth; i++)
+            {
+                printf("  ");
+            }
+            printf("call [%s@0x%x]\n", target_name, get_dnpc());
+            depth++;
+        }
+    }
+    else if (BITS(instr, 6, 0) == 0b1101111)
+    {
+        if (rd == 1 || rd == 5)
+        {
+            // call
+            printf("0x%x: ", pc);
+            for (int i = 0; i < depth; i++)
+            {
+                printf("  ");
+            }
+            printf("call [%s@0x%x]\n", target_name, get_dnpc());
+            depth++;
+        }
+    }
+
+#endif
+}
+
 void cpu_exec(unsigned int n)
 {
     unsigned int cnt = n;
-    while (!finish && cnt-- &&!stop)
+    char log_buf[100];
+    while (!finish && cnt-- && !stop)
     {
         if (n <= 10)
         {
@@ -189,8 +261,11 @@ void cpu_exec(unsigned int n)
                  << setfill('0')
                  << hex
                  << top->instr << " ";
-            disassembleAndPrint(top->instr);
+            disassembleAndPrint(top->instr, log_buf, 1);
         }
+        sprintf(log_buf, "0x%08x: %08x\t", top->pc_val, top->instr);
+        disassembleAndPrint(top->instr, log_buf, 0);
+        writeBuffer(log_buf);
         step_and_dump_wave(2);
         watchpoint_inspect();
     }

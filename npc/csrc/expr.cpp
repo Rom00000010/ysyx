@@ -6,11 +6,13 @@
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
+#include <iostream>
+#include <macro.h>
 #include <stdlib.h>
 #include "svdpi.h"
 #include "Vtop__Dpi.h"
 #include "Vtop.h"
-#define ARRLEN(arr) (int)(sizeof(arr) / sizeof(arr[0]))
+
 extern "C" int get_reg_val_by_abi(const char *abi_name);
 extern Vtop *top;
 
@@ -330,6 +332,15 @@ uint32_t eval(int p, int q, bool *success)
       }
       else
       {
+        const svScope scope = svGetScopeFromName("TOP.top.regfile");
+        if (!scope)
+        {
+          std::cerr << "Failed to get scope for regfile" << std::endl;
+        }
+        else
+        {
+          svSetScope(scope);
+        }
         return get_reg_val_by_abi(&tokens[p].str[1]);
       }
     }

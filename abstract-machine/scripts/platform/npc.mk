@@ -27,6 +27,6 @@ image: image-dep
 
 run: insert-arg
 	@echo "simulate" $(IMAGE).bin
-	@$(NPC_HOME)/obj_dir/Vtop $(IMAGE).bin
+	@$(NPC_HOME)/obj_dir/Vtop $(IMAGE).bin $(IMAGE).elf
 
 .PHONY: insert-arg
