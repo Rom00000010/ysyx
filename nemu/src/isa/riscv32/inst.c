@@ -65,8 +65,9 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_
 
 static int decode_exec(Decode *s) {
   s->dnpc = s->snpc;
+#ifdef CONFIG_FTRACE
   static int depth = 0;
-
+#endif
 #define INSTPAT_INST(s) ((s)->isa.inst)
 #define INSTPAT_MATCH(s, name, type, ... /* execute body */ ) { \
     int rd = 0; \
@@ -109,41 +110,45 @@ static int decode_exec(Decode *s) {
   INSTPAT("??????? ????? ????? 000 ????? 01000 11", sb, S, Mw(src1 + imm, 1, src2));
 
   INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal, J, {
-      R(rd) = s->pc + 4; s->dnpc = s->pc + imm;
-      const char *target_name = func_name(s->dnpc);
-      if(rd == 1 || rd == 5){
-        // call
-        printf("0x%x: ", s->pc);
-        for(int i=0;i<depth;i++){
-          printf("  ");
-        }
-        printf("call [%s@0x%x]\n", target_name, s->dnpc);
-        depth++;
+    R(rd) = s->pc + 4; s->dnpc = s->pc + imm;
+#ifdef CONFIG_FTRACE
+    const char *target_name = func_name(s->dnpc);
+    if (rd == 1 || rd == 5) {
+      // call
+      printf("0x%x: ", s->pc);
+      for (int i = 0; i < depth; i++) {
+        printf("  ");
       }
-      });
+      printf("call [%s@0x%x]\n", target_name, s->dnpc);
+      depth++;
+    }
+#endif
+  });
   INSTPAT("??????? ????? ????? 000 ????? 11001 11", jalr, I, {
-      R(rd) = s->pc + 4; s->dnpc = (src1 + imm) & ~1;
-      const char *name = func_name(cpu.pc);
-      const char *target_name = func_name(s->dnpc);
-      if(rd == 0 && imm == 0 && (rs1 == 1 || rs1 == 5)){
-        // ret
-        depth--;
-        Assert(depth>=0, "ftrace error");
-        printf("0x%x: ", s->pc);
-        for(int i=0;i<depth;i++){
-          printf("  ");
-        }
-        printf("ret  [%s]\n", name);       
-      } else if(rd == 1 || rd == 5){
-        // call
-        printf("0x%x: ", s->pc);
-        for(int i=0;i<depth;i++){
-          printf("  ");
-        }
-        printf("call [%s@0x%x]\n", target_name, s->dnpc);
-        depth++;
+    R(rd) = s->pc + 4; s->dnpc = (src1 + imm) & ~1;
+#ifdef CONFIG_FTRACE
+    const char *name = func_name(cpu.pc);
+    const char *target_name = func_name(s->dnpc);
+    if (rd == 0 && imm == 0 && (rs1 == 1 || rs1 == 5)) {
+      // ret
+      depth--;
+      Assert(depth >= 0, "ftrace error");
+      printf("0x%x: ", s->pc);
+      for (int i = 0; i < depth; i++) {
+        printf("  ");
       }
-      });
+      printf("ret  [%s]\n", name);
+    } else if (rd == 1 || rd == 5) {
+      // call
+      printf("0x%x: ", s->pc);
+      for (int i = 0; i < depth; i++) {
+        printf("  ");
+      }
+      printf("call [%s@0x%x]\n", target_name, s->dnpc);
+      depth++;
+    }
+#endif
+  });
 
   INSTPAT("??????? ????? ????? 000 ????? 11000 11", beq, B, {if (src1 == src2) s->dnpc = s->pc + imm; });
   INSTPAT("??????? ????? ????? 001 ????? 11000 11", bne, B, {if (src1 != src2) s->dnpc = s->pc + imm; });
