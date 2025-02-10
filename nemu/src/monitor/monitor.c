@@ -114,7 +114,9 @@ void init_monitor(int argc, char *argv[]) {
   init_log(log_file);
 
   /* Open the elf file, read symbol table and str table */
-  init_elf(elf_file);
+  if(elf_file != NULL) {
+    init_elf(elf_file);
+  }
 
   /* Initialize memory. */
   init_mem();

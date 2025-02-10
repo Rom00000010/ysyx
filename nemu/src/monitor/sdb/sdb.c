@@ -26,7 +26,7 @@ void init_regex();
 void init_wp_pool();
 void new_wp(char *exp, uint32_t val);
 void watchpoint_display();
-int delete_watchpoint();
+int delete_watchpoint(int no);
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 static char *rl_gets() {
@@ -50,7 +50,6 @@ static int cmd_c(char *args) {
   cpu_exec(-1);
   return 0;
 }
-
 
 static int cmd_q(char *args) {
   nemu_state.state = NEMU_QUIT;
