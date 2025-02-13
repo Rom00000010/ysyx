@@ -1,22 +1,10 @@
-#include "Vtop.h"
-#include "verilated_vcd_c.h"
-#include "verilated.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include <common.h>
+#include <macro.h>
+#include <iringbuf.h>
+#include <capstone/capstone.h>
 #include <iostream>
 #include <iomanip>
-#include <fstream>
-#include <macro.h>
 #include <vector>
-#include <cstdint>
-#include <cstring>
-#include <capstone/capstone.h>
-#include <iringbuf.h>
-#include "svdpi.h"
-#include "Vtop__Dpi.h"
-
-#define CONFIG_WATCHPOINT
-#define CONFIG_FTRACE
 
 using namespace std;
 
@@ -30,24 +18,25 @@ bool finish = false;
 bool stop = false;
 
 vector<uint32_t> mem(1024 * 1024);
-extern "C" void print_rf();
-extern "C" int get_dnpc();
 void sdb_mainloop();
 void calculator_test();
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
+void init_difftest(char *ref_so_file, long img_size, void *mem, int port);
 uint32_t scan_watchpoints(bool *success);
 uint32_t watchpoint_val();
 int watchpoint_no();
 char *watchpoint_exp();
 const char *func_name(uint32_t addr);
 void ftrace(uint32_t pc, uint32_t instr);
+void difftest_step(uint32_t pc);
 
 void set_finish()
-{
+{   SET_REG
     finish = true;
-    if (top->ret_val == 0)
+    if (get_reg_val_by_abi("a0") == 0)
     {
         cout << "\033[1;32m" << "HIT GOOD TRAP" << "\033[0m" << endl;
+        exit(0);
     }
     else
     {
@@ -57,14 +46,61 @@ void set_finish()
     }
 }
 
-uint32_t pmem_read(uint32_t addr)
+extern "C" int pmem_read(int raddr)
 {
-    addr -= 0x80000000;
-    if (addr < mem.size())
+#ifdef CONFIG_MTRACE
+    SET_TOP
+    if (raddr != get_pc_val() && raddr >= 0x80000000 && BITS(get_instr(), 6, 0) == 0b0000011)
     {
-        return mem[addr / 4];
+        printf("access 0x%08x at pc = 0x%08x\n", raddr, get_pc_val());
+    }
+#endif
+    // 总是读取地址为`raddr & ~0x3u`的4字节返回
+    raddr &= ~0x3u;
+    raddr -= 0x80000000;
+    if (raddr / 4 < mem.size())
+    {
+        return mem[raddr / 4];
     }
     return 0;
+}
+extern "C" void pmem_write(int waddr, int wdata, char wmask)
+{
+    SET_TOP
+#ifdef CONFIG_MTRACE
+    if (waddr != get_pc_val() && waddr >= 0x80000000)
+    {
+        printf("write data 0x%08x with mask 0x%02x to addr 0x%08x at pc = 0x%08x\n", wdata, wmask, waddr, get_pc_val());
+    }
+#endif
+    waddr &= ~0x3u;
+    waddr -= 0x80000000;
+
+    if (waddr / 4 < mem.size())
+    {
+        uint32_t *ptr = &mem[waddr / 4];
+
+        uint32_t byte_mask = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            if (wmask & (1 << i))
+            {
+                byte_mask |= (0xFFu << (8 * i));
+            }
+        }
+
+        // calculate bytes wdata need to shift according to mask
+        int shift = 0;
+        unsigned char mask_temp = wmask;
+        while ((mask_temp & 1) == 0 && shift < 4)
+        {
+            shift++;
+            mask_temp >>= 1;
+        }
+        uint32_t aligned_wdata = wdata << (shift * 8);
+
+        *ptr = (*ptr & ~byte_mask) | (aligned_wdata & byte_mask);
+    }
 }
 
 void step_and_dump_wave(unsigned int n)
@@ -76,13 +112,10 @@ void step_and_dump_wave(unsigned int n)
         top->clk ^= 1;
         top->eval();
 
-        if (top->clk == 1)
+        if (top->clk == 0)
         {
-            top->instr = pmem_read(top->pc_val);
-        }
-        else 
-        {
-            ftrace(top->pc_val, top->instr);
+            SET_TOP
+            ftrace(get_pc_val(), get_instr());
         }
         sim_time++;
         tfp->dump(sim_time);
@@ -115,17 +148,15 @@ void single_cycle()
 
 void reset(int n)
 {
-    top->instr = 0;
     top->rst = 1;
     while (n-- > 0)
         single_cycle();
     top->rst = 0;
-    top->instr = pmem_read(top->pc_val);
 }
 
 void disassembleAndPrint(uint32_t inst, char *buf, bool flag)
 {
-    // 初始化 Capstone 反汇编器（以 RISC-V 32 位为例）
+    // 初始化 Capstone 反汇编器
     csh handle;
     if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV32, &handle) != CS_ERR_OK)
     {
@@ -184,15 +215,6 @@ void watchpoint_inspect()
 
 void ftrace(uint32_t pc, uint32_t instr)
 {
-    const svScope scope = svGetScopeFromName("TOP.top");
-    if (!scope)
-    {
-        std::cerr << "Failed to get scope for top" << std::endl;
-    }
-    else
-    {
-        svSetScope(scope);
-    }
 #ifdef CONFIG_FTRACE
     const char *name = func_name(pc);
     const char *target_name = func_name(get_dnpc());
@@ -250,23 +272,21 @@ void cpu_exec(unsigned int n)
     char log_buf[100];
     while (!finish && cnt-- && !stop)
     {
+        SET_TOP
+        uint32_t instr = get_instr();
         if (n <= 10)
         {
-            cout << "0x"
-                 << setw(8)
-                 << setfill('0')
-                 << hex
-                 << top->pc_val << ": ";
-            cout << setw(8)
-                 << setfill('0')
-                 << hex
-                 << top->instr << " ";
-            disassembleAndPrint(top->instr, log_buf, 1);
+            cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
+            cout << setw(8) << setfill('0') << hex << instr << " ";
+            disassembleAndPrint(instr, log_buf, 1);
         }
-        sprintf(log_buf, "0x%08x: %08x\t", top->pc_val, top->instr);
-        disassembleAndPrint(top->instr, log_buf, 0);
+        sprintf(log_buf, "0x%08x: %08x\t", get_pc_val(), instr);
+        disassembleAndPrint(instr, log_buf, 0);
         writeBuffer(log_buf);
+
         step_and_dump_wave(2);
+        difftest_step(get_pc_val());
+
         watchpoint_inspect();
     }
 }
@@ -278,6 +298,11 @@ int main(int argc, char **argv)
     init_monitor(argc, argv, mem);
 
     reset(5);
+
+    uint8_t *byteArray = reinterpret_cast<uint8_t *>(mem.data());
+    size_t byteArraySize = mem.size() * sizeof(uint32_t);
+
+    init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
 
     sdb_mainloop();
 

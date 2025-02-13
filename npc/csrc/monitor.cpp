@@ -1,18 +1,15 @@
+#include <common.h>
+#include <iringbuf.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <stdlib.h>
-#include <iringbuf.h>
 #include <string>
-#include <string.h>
-#include <cstdint>
 using namespace std;
 
 void init_sdb();
-
 void init_elf(const char *elf_file);
 
-void img_init(int argc, char **argv, vector <uint32_t> &mem)
+void img_init(int argc, char **argv, vector<uint32_t> &mem)
 {
     // get image path
     if (argc < 2)
@@ -44,7 +41,7 @@ void img_init(int argc, char **argv, vector <uint32_t> &mem)
     memcpy(mem.data(), buffer.data(), buffer.size());
 }
 
-void init_monitor(int argc, char **argv, vector <uint32_t> &mem)
+void init_monitor(int argc, char **argv, vector<uint32_t> &mem)
 {
     img_init(argc, argv, mem);
 

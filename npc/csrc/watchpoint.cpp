@@ -1,9 +1,4 @@
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <cassert>
-#include <regex.h>
-#include <cstdio>
+#include <common.h>
 
 uint32_t pmem_read(uint32_t addr);
 uint32_t expr(char *e, bool *success);

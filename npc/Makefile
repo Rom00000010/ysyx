@@ -50,7 +50,8 @@ clean:
 
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	verilator -MMD --cc vsrc/top.v vsrc/muxkey.v --exe csrc/*.cpp -j 0 --build -LDFLAGS "-lreadline -lcapstone" -Wall -Ivsrc --trace -CFLAGS "-I../include"
+	verilator -MMD -Wall --cc vsrc/*.v -top top -I./include --trace -j 0 --build \
+	-exe csrc/*.cpp -LDFLAGS "-lreadline -lcapstone" -CFLAGS "-I../include"
 
 include ../Makefile
 

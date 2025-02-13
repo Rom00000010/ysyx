@@ -1,22 +1,9 @@
-/* We use the POSIX regex functions to process regular expressions.
- * Type 'man regex' for more information about POSIX regex functions.
- */
-#include <regex.h>
-#include <cassert>
-#include <cstring>
-#include <cstdint>
-#include <cstdio>
-#include <iostream>
 #include <macro.h>
-#include <stdlib.h>
-#include "svdpi.h"
-#include "Vtop__Dpi.h"
-#include "Vtop.h"
+#include <common.h>
+#include <regex.h>
+#include <iostream>
 
-extern "C" int get_reg_val_by_abi(const char *abi_name);
-extern Vtop *top;
-
-uint32_t pmem_read(uint32_t addr);
+int pmem_read(int addr);
 
 enum
 {
@@ -327,20 +314,13 @@ uint32_t eval(int p, int q, bool *success)
     if (type == TK_IDENTIFIER)
     {
       if (strcmp(tokens[p].str, "$pc") == 0)
-      {
-        return top->pc_val;
+      { 
+        SET_TOP
+        return get_pc_val();
       }
       else
       {
-        const svScope scope = svGetScopeFromName("TOP.top.regfile");
-        if (!scope)
-        {
-          std::cerr << "Failed to get scope for regfile" << std::endl;
-        }
-        else
-        {
-          svSetScope(scope);
-        }
+        SET_REG
         return get_reg_val_by_abi(&tokens[p].str[1]);
       }
     }

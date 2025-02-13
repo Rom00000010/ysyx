@@ -1,7 +1,5 @@
 #ifndef IRINGBUF
 #define IRINGBUF
-#include <string.h>
-#include <stdio.h>
 
 #define BUFFER_SIZE 15
 

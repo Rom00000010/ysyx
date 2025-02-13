@@ -7,13 +7,13 @@ module RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
         output[DATA_WIDTH-1:0] rdata1,
         input [ADDR_WIDTH-1:0] raddr2,
         output[DATA_WIDTH-1:0] rdata2,
-        output[DATA_WIDTH-1:0] ret_val,
         input wen
     );
     reg [DATA_WIDTH-1:0] rf [2**ADDR_WIDTH-1:0];
     wire write_enable;
     wire [31:0]zero_reg=32'h00000000;
 
+    // $0 always keep zero
     assign write_enable = wen & (waddr != 0);
 
     always @(posedge clk) begin
@@ -23,8 +23,8 @@ module RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
 
     assign rdata1 = raddr1 == 0 ? zero_reg : rf[raddr1];
     assign rdata2 = raddr2 == 0 ? zero_reg : rf[raddr2];
-    assign ret_val = rf[10];
 
+    // for sdb info register
     function automatic [79:0] get_abi_name;
         input [3:0] reg_index;
         begin
@@ -80,6 +80,7 @@ module RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
         end
     endtask
 
+    // for sdb print register
     function automatic int abi_to_index(input string abi_name);
         begin
             if      (abi_name == "$0") abi_to_index = 0;

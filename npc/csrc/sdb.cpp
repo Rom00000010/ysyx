@@ -1,25 +1,15 @@
+#include <common.h>
+#include <macro.h>
 #include <readline/history.h>
 #include <readline/readline.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <macro.h>
-#include <stdint.h>
-#include <iostream>
-#include <assert.h>
-#include "svdpi.h"
-#include "Vtop__Dpi.h"
 
-extern "C" void print_rf();
-#define CONFIG_WATCHPOINT
-
-bool is_batch_mode = false;
+bool is_batch_mode = true;
 extern bool stop;
 void cpu_exec(unsigned int n);
 void init_regex();
 void init_wp_pool();
 uint32_t expr(char *e, bool *success);
-uint32_t pmem_read(uint32_t addr);
+int pmem_read(int addr);
 void new_wp(char *exp, uint32_t val);
 void watchpoint_display();
 int delete_watchpoint(int no);
@@ -51,15 +41,7 @@ static int cmd_info(char *args)
 
   if (strcmp(arg, "r") == 0)
   {
-    const svScope scope = svGetScopeFromName("TOP.top.regfile");
-    if (!scope)
-    {
-      std::cerr << "Failed to get scope for regfile" << std::endl;
-    }
-    else
-    {
-      svSetScope(scope);
-    }
+    SET_REG
     print_rf();
   }
   else

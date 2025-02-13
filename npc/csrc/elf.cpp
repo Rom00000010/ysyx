@@ -1,8 +1,5 @@
 #include <elf.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <cassert>
+#include <common.h>
 
 FILE *elf_fp = NULL;
 Elf32_Sym *symtab = NULL;
