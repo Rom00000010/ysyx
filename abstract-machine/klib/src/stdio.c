@@ -7,6 +7,15 @@
 
 int sprintf(char *out, const char *fmt, ...);
 
+void apply_padding(char *out, size_t *bytes, int padding, int zero_padding) {
+  if (zero_padding) {
+    memset(out + *bytes, '0', padding);
+  } else {
+    memset(out + *bytes, ' ', padding);
+  }
+  *bytes += padding;
+}
+
 int printf(const char *fmt, ...) {
   char buf[1024];
 
@@ -28,52 +37,66 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
   size_t len = strlen(fmt);
   int i = 0, j = 0;
   size_t bytes = 0;
+  
+  // initialize to empty string
+  out[0] = '\0';
 
-  // first part
-  if (fmt[i] == '%') {
-    j = i + 1;
-    if (fmt[j] == 'd') {
-      int n = va_arg(ap, int);
-      char buf[20];
-      to_string(n, buf);
-      strcpy(out, buf);
-      bytes += strlen(buf);
-    } else if (fmt[j] == 's') {
-      char *s = va_arg(ap, char*);
-      strcpy(out, s);
-      bytes += strlen(s);
-    } else {
-      panic("Not implemented");
-    }
-    i = j + 1;
-    j = i;
-  } else {
-    while (fmt[j] != '\0' && fmt[j] != '%') {j++;}
-    memcpy(out, fmt+i, j - i);
-    out[j - i] = '\0';
-    bytes += j - i;
-    i = j;
-  }
-
-  // rest character or conversion specification
   while (i < len) {
     if (fmt[i] == '%') {
+      // formatted output
       j = i + 1;
+
+      int width = 0;
+      int zero_padding = 0;
+      // Extract padding element
+      if(fmt[j] == '0') {
+        zero_padding = 1;
+        j++;
+      }
+      // Extract padding width
+      while(fmt[j] >= '0' && fmt[j] <= '9') {
+        width = width * 10 + fmt[j] - '0';
+        j++;
+      }
+
       if (fmt[j] == 'd') {
         int n = va_arg(ap, int);
         char buf[20];
         to_string(n, buf);
-        strcat(out, buf);
-        bytes += strlen(buf);
+        int buf_len = strlen(buf);
+        
+        int padding = width > buf_len ? width - buf_len : 0;
+        apply_padding(out, &bytes, padding, zero_padding);
+        strcpy(out + bytes, buf);
+        bytes += buf_len;
+
+      } else if(fmt[j] == 'x' || fmt[j] == 'X'){
+        unsigned int n = va_arg(ap, unsigned int);
+        char buf[20];
+        int upper_case = (fmt[j] == 'X'); 
+        to_hex_string(n, buf, upper_case);
+        int buf_len = strlen(buf);
+        
+        int padding = width > buf_len ? width - buf_len : 0;
+        apply_padding(out, &bytes, padding, zero_padding);
+        strcpy(out + bytes, buf);
+        bytes += buf_len;
+
       } else if (fmt[j] == 's') {
         char *s = va_arg(ap, char*);
         strcat(out, s);
         bytes += strlen(s);
+
+      } else if (fmt[j] == 'c'){
+        char c = va_arg(ap, int);
+        out[bytes] = c;
+        out[bytes + 1] = '\0';
+        bytes++;
+
       } else {
         panic("Not implemented");
       }
       i = j + 1;
-      j = i;
     } else {
       while (fmt[j] != '\0' && fmt[j] != '%') {j++;}
       int str_len = strlen(out);
@@ -88,67 +111,10 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
 }
 
 int sprintf(char *out, const char *fmt, ...) {
-  size_t len = strlen(fmt);
-  int i = 0, j = 0;
-  size_t bytes = 0;
-
   va_list args;
   va_start(args, fmt);
 
-  // first part
-  if (fmt[i] == '%') {
-    j = i + 1;
-    if (fmt[j] == 'd') {
-      int n = va_arg(args, int);
-      char buf[20];
-      to_string(n, buf);
-      strcpy(out, buf);
-      bytes += strlen(buf);
-    } else if (fmt[j] == 's') {
-      char *s = va_arg(args, char*);
-      strcpy(out, s);
-      bytes += strlen(s);
-    } else {
-      panic("Not implemented");
-    }
-    i = j + 1;
-    j = i;
-  } else {
-    while (fmt[j] != '\0' && fmt[j] != '%') {j++;}
-    memcpy(out, fmt+i, j - i);
-    out[j - i] = '\0';
-    bytes += j - i;
-    i = j;
-  }
-
-  // rest character or conversion specification
-  while (i < len) {
-    if (fmt[i] == '%') {
-      j = i + 1;
-      if (fmt[j] == 'd') {
-        int n = va_arg(args, int);
-        char buf[20];
-        to_string(n, buf);
-        strcat(out, buf);
-        bytes += strlen(buf);
-      } else if (fmt[j] == 's') {
-        char *s = va_arg(args, char*);
-        strcat(out, s);
-        bytes += strlen(s);
-      } else {
-        panic("Not implemented");
-      }
-      i = j + 1;
-      j = i;
-    } else {
-      while (fmt[j] != '\0' && fmt[j] != '%') {j++;}
-      int str_len = strlen(out);
-      memcpy(out + str_len, fmt + i, j - i);
-      out[str_len + j - i] = '\0';
-      bytes += j - i;
-      i = j;
-    }
-  }
+  size_t bytes = vsprintf(out, fmt, args);
 
   va_end(args);
 

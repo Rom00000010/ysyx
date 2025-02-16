@@ -83,8 +83,22 @@ void *memset(void *s, int c, size_t n) {
 }
 
 void *memmove(void *dst, const void *src, size_t n) {
-  panic("Not implemented");
+  if (dst < src || (char*)dst >= (char*)src + n) {
+    return memcpy(dst, src, n);
+  } else {
+    // overlap and src is before dst
+    char *d = dst;
+    const char *s = src;
+
+    for(size_t i = n; i != 0; i--) {
+      d[i-1] = s[i-1];
+    }
+
+    return dst;
+  }
 }
+
+
 
 void *memcpy(void *out, const void *in, size_t n) {
   // assume two range is not overlaped

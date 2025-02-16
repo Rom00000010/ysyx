@@ -31,6 +31,7 @@ void   free      (void *ptr);
 int    abs       (int x);
 int    atoi      (const char *nptr);
 char*  to_string (int val, char *str);
+void   to_hex_string(unsigned int n, char *buf, int upper_case);
 
 // stdio.h
 int    printf    (const char *format, ...);

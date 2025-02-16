@@ -4,6 +4,8 @@
 
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 static unsigned long int next = 1;
+extern char _heap_start;
+static char *hbrk = &_heap_start;
 
 int rand(void) {
   // RAND_MAX assumed to be 32767
@@ -68,13 +70,52 @@ char *to_string(int val, char *str) {
     return str;
 }
 
+void to_hex_string(unsigned int n, char *buf, int upper_case) {
+        // Converting LUT
+        char hex_digits[] = "0123456789abcdef";
+        if (upper_case){
+          hex_digits[10] = 'A';
+          hex_digits[11] = 'B';
+          hex_digits[12] = 'C';
+          hex_digits[13] = 'D';
+          hex_digits[14] = 'E';
+          hex_digits[15] = 'F';
+        }
+
+        // Manually convert decimal int to hex string
+        int l = 0;
+        if(n==0){
+          buf[l++] = '0';
+        } else {
+          unsigned int tmp = n;
+          while(tmp > 0){
+            buf[l++] = hex_digits[tmp % 16];
+            tmp /= 16;
+          }
+
+          // Reverse
+          for(int m = 0; m <l/2; m++){
+            char tmp = buf[m];
+            buf[m] = buf[l - m - 1];
+            buf[l - m - 1] = tmp;
+          }
+          buf[l] = '\0';
+        }
+}
 
 void *malloc(size_t size) {
   // On native, malloc() will be called during initializaion of C runtime.
   // Therefore do not call panic() here, else it will yield a dead recursion:
   //   panic() -> putchar() -> (glibc) -> malloc() -> panic()
 #if !(defined(__ISA_NATIVE__) && defined(__NATIVE_USE_KLIB__))
-  panic("Not implemented");
+    size  = (size_t)ROUNDUP(size, 8);
+    char *old = hbrk;
+    hbrk += size;
+    assert((uintptr_t)heap.start <= (uintptr_t)hbrk && (uintptr_t)hbrk < (uintptr_t)heap.end);
+    for (uint64_t *p = (uint64_t *)old; p != (uint64_t *)hbrk; p ++) {
+       *p = 0;
+    }
+    return old;
 #endif
   return NULL;
 }
