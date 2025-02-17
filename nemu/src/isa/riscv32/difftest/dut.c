@@ -19,14 +19,14 @@
 
 bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
    for(int i = 0; i < 32; i++){
-    if(ref_r->gpr[i] == cpu.gpr[i]) {
+    if(difftest_check_reg(regs[i], pc, ref_r->gpr[i], cpu.gpr[i])){ 
       continue;
     } else {
       pc = cpu.pc;
       return false;
     }
   }
-  return cpu.pc == ref_r->pc; 
+  return difftest_check_reg("pc", pc, ref_r->pc, cpu.pc); 
 }
 
 void isa_difftest_attach() {
