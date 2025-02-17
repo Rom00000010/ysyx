@@ -15,7 +15,7 @@ module Alu(
             LESSU, {31'b0, a<b},
             XOR, a^b,
             SRL, a>>b,
-            SRA, a>>>b,
+            SRA, $signed(a)>>>b,
             OR, a|b,
             AND, a&b
         }

@@ -18,7 +18,7 @@ module top (
     InstrType imm_src;
     AluCtrl alu_ctrl;
     wire [1:0]alu_srca;
-    wire alu_srcb;
+    wire [1:0]alu_srcb;
     Branch branch;
     wire reg_write;
     wire write_src;
@@ -73,10 +73,11 @@ module top (
             );
 
     wire [31:0]opr;
-    MuxKey #(2, 1, 32) op2 (
+    MuxKey #(3, 2, 32) op2 (
                 opr, alu_srcb, {
-                    1'b0, data_reg2,
-                    1'b1, ext_imm
+                    2'b00, data_reg2,
+                    2'b01, ext_imm,
+                    2'b10, data_reg2 & 32'h0000001f
                 }
             );
 

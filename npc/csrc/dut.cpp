@@ -20,6 +20,22 @@ const char *regs[] = {
 // Get state from digital circuit to compare with nemu
 CPU_state cpu;
 
+static bool is_skip_ref = false;
+
+// this is used to let ref skip instructions which
+// can not produce consistent behavior with NEMU
+void difftest_skip_ref()
+{
+    is_skip_ref = true;
+    // If such an instruction is one of the instruction packing in QEMU
+    // (see below), we end the process of catching up with QEMU's pc to
+    // keep the consistent behavior in our best.
+    // Note that this is still not perfect: if the packed instructions
+    // already write some memory, and the incoming instruction in NEMU
+    // will load that memory, we will encounter false negative. But such
+    // situation is infrequent.
+}
+
 void get_cpu_state(CPU_state *s)
 {
     for (int i = 0; i < 16; i++)
@@ -92,6 +108,15 @@ error:
 void difftest_step(uint32_t pc)
 {
     CPU_state ref_r;
+
+    if (is_skip_ref)
+    {
+        // to skip the checking of an instruction, just copy the reg state to reference design
+        get_cpu_state(&cpu);
+        ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
+        is_skip_ref = false;
+        return;
+    }
 
     ref_difftest_exec(1);
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);

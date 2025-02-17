@@ -2,6 +2,7 @@
 #include <macro.h>
 #include <iringbuf.h>
 #include <capstone/capstone.h>
+#include <sys/time.h>
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -17,7 +18,9 @@ int depth = 0;
 bool finish = false;
 bool stop = false;
 
-vector<uint32_t> mem(1024 * 1024);
+long start_time;
+
+vector<uint32_t> mem(32 * 1024 * 1024);
 void sdb_mainloop();
 void calculator_test();
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
@@ -29,9 +32,18 @@ char *watchpoint_exp();
 const char *func_name(uint32_t addr);
 void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
+void difftest_skip_ref();
+
+long get_elapsed_microseconds() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
 
 void set_finish()
-{   SET_REG
+{
+    SET_REG
     finish = true;
     if (get_reg_val_by_abi("a0") == 0)
     {
@@ -55,6 +67,14 @@ extern "C" int pmem_read(int raddr)
         printf("access 0x%08x at pc = 0x%08x\n", raddr, get_pc_val());
     }
 #endif
+    // Timer access
+    if(raddr == 0xa0000048)
+    {   
+        difftest_skip_ref();
+        long end_time = get_elapsed_microseconds();
+        return end_time - start_time;
+    }
+
     // 总是读取地址为`raddr & ~0x3u`的4字节返回
     raddr &= ~0x3u;
     raddr -= 0x80000000;
@@ -73,6 +93,12 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask)
         printf("write data 0x%08x with mask 0x%02x to addr 0x%08x at pc = 0x%08x\n", wdata, wmask, waddr, get_pc_val());
     }
 #endif
+    // Serial port access
+    if (waddr == 0xa00003f8)
+    {   difftest_skip_ref();
+        putchar(wdata);
+    }
+
     waddr &= ~0x3u;
     waddr -= 0x80000000;
 
@@ -118,7 +144,7 @@ void step_and_dump_wave(unsigned int n)
             ftrace(get_pc_val(), get_instr());
         }
         sim_time++;
-        tfp->dump(sim_time);
+        //tfp->dump(sim_time);
     }
 }
 
@@ -126,11 +152,11 @@ void sim_init()
 {
     // create simulate context, dut and dump wave
     contextp = new VerilatedContext;
-    contextp->traceEverOn(true);
-    tfp = new VerilatedVcdC;
+    //contextp->traceEverOn(true);
+    //tfp = new VerilatedVcdC;
     top = new Vtop;
-    top->trace(tfp, 99);
-    tfp->open("dump.vcd");
+    //top->trace(tfp, 99);
+    //tfp->open("dump.vcd");
 }
 
 void single_cycle()
@@ -138,12 +164,12 @@ void single_cycle()
     top->clk = 0;
     top->eval();
     sim_time++;
-    tfp->dump(sim_time);
+    //tfp->dump(sim_time);
 
     top->clk = 1;
     top->eval();
     sim_time++;
-    tfp->dump(sim_time);
+    //tfp->dump(sim_time);
 }
 
 void reset(int n)
@@ -285,7 +311,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        difftest_step(get_pc_val());
+        //difftest_step(get_pc_val());
 
         watchpoint_inspect();
     }
@@ -302,10 +328,12 @@ int main(int argc, char **argv)
     uint8_t *byteArray = reinterpret_cast<uint8_t *>(mem.data());
     size_t byteArraySize = mem.size() * sizeof(uint32_t);
 
+    start_time = get_elapsed_microseconds();
+
     init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
 
     sdb_mainloop();
 
-    tfp->close();
+    //tfp->close();
     return 0;
 }

@@ -7,7 +7,7 @@ module CtrlUnit(
         output InstrType imm_src,
         output AluCtrl alu_ctrl,
         output [1:0]alu_srca,
-        output alu_srcb,
+        output [1:0]alu_srcb,
         output reg_write,
         output write_src,
         output Branch branch,
@@ -58,6 +58,7 @@ module CtrlUnit(
 
     // for lui & auipc special case 
     wire [1:0] u_srca = (opcode == 7'b0110111) ? 2'b01 : 2'b10;
+    wire shamtr_srca = (opcode == 7'b0110011 && (func3 == 3'b101 || func3 == 3'b001));
     // J-type don't use alu
     MuxKey #(5,3,2) alu_srca_mux(
                alu_srca, instr_type, {
@@ -69,13 +70,13 @@ module CtrlUnit(
                }
            );
 
-    MuxKey #(5,3,1) alu_srcb_mux(
+    MuxKey #(5,3,2) alu_srcb_mux(
                alu_srcb, instr_type, {
-                   R_TYPE, 1'b0, // rs2
-                   B_TYPE, 1'b0, // rs2
-                   I_TYPE, 1'b1, // imm
-                   U_TYPE, 1'b1, // imm
-                   S_TYPE, 1'b1  // imm
+                   R_TYPE, shamtr_srca ? 2'b10 : 2'b00, // rs2
+                   B_TYPE, 2'b0, // rs2
+                   I_TYPE, 2'b1, // imm
+                   U_TYPE, 2'b1, // imm
+                   S_TYPE, 2'b1  // imm
                }
            );
 

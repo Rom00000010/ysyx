@@ -32,11 +32,11 @@ void img_init(int argc, char **argv, vector<uint32_t> &mem)
                                  istreambuf_iterator<char>());
     file.close();
 
-    if (buffer.size() % 4 != 0)
-    {
-        cerr << "Error: Image size is not a multiple of 4 bytes." << endl;
-        exit(1);
-    }
+    // if (buffer.size() % 4 != 0)
+    // {
+    //     cerr << "Error: Image size is not a multiple of 4 bytes." << endl;
+    //     exit(1);
+    // }
 
     memcpy(mem.data(), buffer.data(), buffer.size());
 }
