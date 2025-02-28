@@ -14,13 +14,22 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include "../local-include/reg.h"
+
+#define SR(i) sr(i)
 
 word_t isa_raise_intr(word_t NO, vaddr_t epc) {
   /* TODO: Trigger an interrupt/exception with ``NO''.
    * Then return the address of the interrupt/exception vector.
    */
+  
+#ifdef CONFIG_ETRACE
+  printf("Interrupt NO: %d at PC: 0x%08x\n", NO, epc);
+#endif
 
-  return 0;
+  SR(0x341) = epc;
+  SR(0x342) = NO;
+  return SR(0x305);
 }
 
 word_t isa_query_intr() {
