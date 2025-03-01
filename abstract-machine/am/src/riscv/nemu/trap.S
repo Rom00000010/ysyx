@@ -13,7 +13,7 @@
 #endif
 
 #define REGS_LO16(f) \
-      f( 1)       f( 3) f( 4) f( 5) f( 6) f( 7) f( 8) f( 9) \
+      f( 1) f( 3) f( 4) f( 5) f( 6) f( 7) f( 8) f( 9) \
 f(10) f(11) f(12) f(13) f(14) f(15)
 #ifndef __riscv_e
 #define REGS_HI16(f) \
@@ -59,6 +59,7 @@ __am_asm_trap:
 
   mv a0, sp
   call __am_irq_handle
+  mv sp, a0
 
   LOAD t1, OFFSET_STATUS(sp)
   LOAD t2, OFFSET_EPC(sp)

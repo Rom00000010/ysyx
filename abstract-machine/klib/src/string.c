@@ -65,7 +65,15 @@ int strcmp(const char *s1, const char *s2) {
 }
 
 int strncmp(const char *s1, const char *s2, size_t n) {
-  panic("Not implemented");
+  // Assume s1 and s2's length is normal case
+  for(size_t i = 0; i< n ; i++){
+    if(s1[i] == s2[i]){
+      continue;
+    } else {
+      return s1[i] - s2[i];
+    }
+  }
+  return 0;
 }
 
 void *memset(void *s, int c, size_t n) {
