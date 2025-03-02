@@ -10,7 +10,8 @@
 using namespace std;
 
 VerilatedContext *contextp = NULL;
-VerilatedVcdC *tfp = NULL;
+// VerilatedVcdC *tfp = NULL;
+VerilatedFstC *tfp = NULL;
 Vtop *top;
 
 vluint64_t sim_time = 0;
@@ -95,8 +96,12 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask)
 #endif
     // Serial port access
     if (waddr == 0xa00003f8)
-    {   difftest_skip_ref();
+    {   
+        difftest_skip_ref();
         putchar(wdata);
+        fflush(stdout);
+        return;
+
     }
 
     waddr &= ~0x3u;
@@ -153,10 +158,10 @@ void sim_init()
     // create simulate context, dut and dump wave
     contextp = new VerilatedContext;
     //contextp->traceEverOn(true);
-    //tfp = new VerilatedVcdC;
+    //tfp = new VerilatedFstC;
     top = new Vtop;
     //top->trace(tfp, 99);
-    //tfp->open("dump.vcd");
+    //tfp->open("dump.fst");
 }
 
 void single_cycle()
@@ -216,6 +221,9 @@ void disassembleAndPrint(uint32_t inst, char *buf, bool flag)
     else
     {
         std::cerr << "ERROR: Failed to disassemble the given instruction" << std::endl;
+        printf("%08x %08x\n", inst, get_pc_val());
+        tfp->close();
+        exit(1);
     }
 
     cs_close(&handle);
@@ -311,7 +319,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        //difftest_step(get_pc_val());
+        // difftest_step(get_pc_val());
 
         watchpoint_inspect();
     }

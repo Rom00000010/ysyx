@@ -21,8 +21,11 @@ module top (
     wire [1:0]alu_srcb;
     Branch branch;
     wire reg_write;
-    wire write_src;
+    wire [1:0]write_src;
     wire mem_wen;
+    wire csr_wen;
+    wire ecall;
+    wire mret;
 
     // Operand
     wire [31:0]data_reg1, data_reg2, wdata_regd;
@@ -50,12 +53,20 @@ module top (
     wire [3:0] rs2 = instr[23:20];
     wire [3:0] rd = instr[10:7];
     wire [2:0] func3 = instr[14:12];
+    wire [11:0] func12 = instr[31:20];
     wire func7 = instr[30];
     wire [6:0] opcode = instr[6:0];
 
-    CtrlUnit ctrl (.opcode(opcode), .func3(func3), .func7(func7), .imm_src(imm_src), .reg_write(reg_write), .branch(branch), .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), .write_src(write_src), .mem_wen(mem_wen));
+    CtrlUnit ctrl (.opcode(opcode), .func3(func3), .func7(func7), .func12(func12), .imm_src(imm_src), .reg_write(reg_write), .branch(branch), .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), .write_src(write_src), .mem_wen(mem_wen), .csr_wen(csr_wen), .ecall(ecall), .mret(mret));
 
     Ext extender (.imm_src(imm_src), .instr(instr), .imm(ext_imm));
+
+    wire [31:0]csr_out;
+    wire [31:0]mtvec;
+    wire [31:0]mepc;
+    wire [31:0]mcause = ecall ? 32'd11 : 32'd0;
+    wire [31:0]csr_in = func3 == 3'b010 ? data_reg1 | csr_out : data_reg1;
+    Csr csr (.clk(clk), .rst(rst), .addr(ext_imm), .csr_in(data_reg1), .csr_out(csr_out), .csr_wen(csr_wen), .exception(ecall), .exception_pc(pc_val), .exception_cause(mcause), .mtvec(mtvec), .mepc(mepc));
 
     RegisterFile #(.ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
                     .clk(clk), .wdata(wdata_regd), .rst(rst),
@@ -109,11 +120,11 @@ module top (
         }
     );
 
-    // Asyn read/write for now, filter illegal access when mtrace
+    // Asyn read/write for now (need to configure for difftest IO), filter illegal access when mtrace
     always @(*) begin
         if (valid != 1'b0) begin // 有读写请求时
             rdata = pmem_read(raddr);
-            if (mem_wen) begin // 有写请求时
+            if (mem_wen && clk == 1'b0) begin // 有写请求时
             pmem_write(waddr, wdata, wmask);
             end
         end
@@ -152,33 +163,36 @@ module top (
     wire [31:0]triggered = (alu_res == 0) ? pc_val+ext_imm : snpc;
     wire [31:0]untriggered = (alu_res != 0) ? pc_val+ext_imm : snpc;
 
-    MuxKey #(9, 4, 32) next_pc_mux(
+    MuxKey #(11, 4, 32) next_pc_mux(
         next_pc, branch, {
-            NO, snpc,
-            JAL, pc_val + ext_imm,
-            JALR, (data_reg1 + ext_imm)&~1,
-            BEQ, triggered,
-            BNE, untriggered,
-            BLT, lt_triggered,
-            BGE, lt_untriggered,
-            BLTU, lt_triggered, 
-            BGEU, lt_untriggered
+            NO,    snpc,
+            JAL,   pc_val + ext_imm,
+            JALR,  (data_reg1 + ext_imm)&~1,
+            BEQ,   triggered,
+            BNE,   untriggered,
+            BLT,   lt_triggered,
+            BGE,   lt_untriggered,
+            BLTU,  lt_triggered, 
+            BGEU,  lt_untriggered,
+            ECALL, mtvec,
+            MRET,  mepc
         }
     );
 
     // Reg Write
-    wire [31:0] link_or_alu;
-    MuxKey #(2,1,32) write_data_mux(
-        link_or_alu, write_src, {
-            1'b0, alu_res,
-            1'b1, snpc   // jal&jalr
+    wire [31:0] link_alu_csr;
+    MuxKey #(3,2,32) write_data_mux(
+        link_alu_csr, write_src, {
+            2'b00, alu_res,
+            2'b01, snpc,   // jal&jalr
+            2'b10, csr_out  // csr
         }
     );
 
     // not optimal encode
     MuxKey #(2, 1, 32) wdata_regd_mux(
         wdata_regd, valid, {
-            1'b0, link_or_alu,
+            1'b0, link_alu_csr,
             1'b1, mask_data // lw result
         }
     );

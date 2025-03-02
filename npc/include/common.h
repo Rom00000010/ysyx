@@ -2,6 +2,7 @@
 #include "Vtop__Dpi.h"
 #include "Vtop.h"
 #include "verilated_vcd_c.h"
+#include "verilated_fst_c.h"
 #include "verilated.h"
 
 #include <string.h>
@@ -10,7 +11,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-#define CONFIG_WATCHPOINT
+// #define CONFIG_WATCHPOINT
 // #define CONFIG_FTRACE
 // #define CONFIG_MTRACE
 

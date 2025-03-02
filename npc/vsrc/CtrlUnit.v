@@ -4,18 +4,25 @@ module CtrlUnit(
         input [6:0]opcode,
         input [2:0]func3,
         input func7,
+        input [11:0]func12,
         output InstrType imm_src,
         output AluCtrl alu_ctrl,
         output [1:0]alu_srca,
         output [1:0]alu_srcb,
         output reg_write,
-        output write_src,
+        output [1:0]write_src,
         output Branch branch,
-        output mem_wen
+        output mem_wen,
+        output csr_wen,
+        output ecall,
+        output mret
     );
 
+    assign ecall = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h000;
+    assign mret  = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h302;
+
     InstrType instr_type;
-    MuxKey #(9,7,3) instr_type_mux(
+    MuxKey #(10,7,3) instr_type_mux(
                instr_type, opcode, {
                    7'b0110111, U_TYPE, // U-type lui
                    7'b0110011, R_TYPE, // R-type arithmetic
@@ -25,13 +32,14 @@ module CtrlUnit(
                    7'b1101111, J_TYPE, // J-type jal
                    7'b1100111, I_TYPE, // I-type jalr
                    7'b1100011, B_TYPE,
-                   7'b0000011, I_TYPE  // I-type lw
+                   7'b0000011, I_TYPE, // I-type lw
+                   7'b1110011, I_TYPE  // I-type system instr
                }
            );
     // Extend imm based on instruction type
     assign imm_src = instr_type;
 
-    // Itype: lw(add for address), I/R type arithmetic, jalr(don't use alu to calculate)
+    // Itype: lw(add for address), I/R type arithmetic, jalr/csrrw(don't use alu to calculate)
     wire [3:0]srial = (func3==3'b101)? {func7, func3} : {1'b0, func3};
     wire [3:0]itype_ctrl = (opcode==7'b0000011) ? 4'b0000 : srial;
     wire [3:0]btype_ctrl;
@@ -80,9 +88,11 @@ module CtrlUnit(
                }
            );
 
+    // ecall/mret instr don't write register
+    wire itype_reg_write = (ecall || mret) ? 1'b0 : 1'b1; 
     MuxKey #(6,3,1) reg_write_mux(
                reg_write, instr_type, {
-                   I_TYPE, 1'b1,
+                   I_TYPE, itype_reg_write,
                    R_TYPE, 1'b1,
                    S_TYPE, 1'b0,
                    U_TYPE, 1'b1,
@@ -103,25 +113,35 @@ module CtrlUnit(
                }
            );
 
-    MuxKey #(3, 7, 4) branch_mux(
+    wire [3:0]system_branch = (ecall || mret) ? (ecall ? ECALL : MRET) : NO;
+    MuxKey #(4, 7, 4) branch_mux(
                branch, opcode, {
                    7'b1101111, JAL,
                    7'b1100111, JALR,
-                   7'b1100011, btype_branch
+                   7'b1100011, btype_branch,
+                   7'b1110011, system_branch
                }
            );
 
-    MuxKey #(3, 4, 1) write_src_mux(
+    wire [1:0]alu_csr = (opcode == 7'b1110011) ? 2'b10 : 2'b00;
+
+    MuxKey #(3, 4, 2) write_src_mux(
                write_src, branch, {
-                   NO, 1'b0,   // alu_res
-                   JAL, 1'b1,   // pc+4 for link
-                   JALR, 1'b1
+                   NO, alu_csr,   // alu_res or csr
+                   JAL, 2'b01,   // pc+4 for link
+                   JALR, 2'b01
                }
            );
 
     MuxKey #(1, 7, 1) mem_wen_mux(
         mem_wen, opcode, {
             7'b0100011, 1'b1
+        }
+    );
+
+    MuxKey #(1, 7, 1) csr_wen_mux(
+        csr_wen, opcode, {
+            7'b1110011, mret? 1'b0 : 1'b1
         }
     );
 
