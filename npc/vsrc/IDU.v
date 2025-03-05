@@ -1,25 +1,72 @@
 `include "common.vh"
 /* verilator lint_off UNUSEDSIGNAL */
-module CtrlUnit(
-        input [6:0]opcode,
-        input [2:0]func3,
-        input func7,
-        input [11:0]func12,
-        output InstrType imm_src,
+module IDU(
+        input clk,
+        input rst,
+        input [31:0]instr,
+        input [31:0]pc_val,
+        input [31:0]wdata_regd,
+        input [31:0]csr_in,
+
         output AluCtrl alu_ctrl,
         output [1:0]alu_srca,
         output [1:0]alu_srcb,
-        output reg_write,
         output [1:0]write_src,
+        output [2:0]mem_width,
         output Branch branch,
         output mem_wen,
-        output csr_wen,
-        output ecall,
-        output mret
+        output valid,
+
+        output [31:0]ext_imm,
+        output [31:0]data_reg1,
+        output [31:0]data_reg2,
+        output [31:0]csr_out,
+        output [31:0]mepc,
+        output [31:0]mtvec
     );
 
-    assign ecall = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h000;
-    assign mret  = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h302;
+    wire [2:0] func3 = instr[14:12];
+    wire [11:0] func12 = instr[31:20];
+    wire func7 = instr[30];
+    wire [6:0] opcode = instr[6:0];
+
+    // load, store, ecall or mret
+    assign valid = ((opcode == 7'b0000011) || (opcode == 7'b0100011));
+    assign mem_width = func3;
+    wire ecall = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h000;
+    wire mret  = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h302;
+
+    // Extend immediate
+    wire shamt = (opcode == 7'b0010011) && (func3 == 3'b101 || func3 == 3'b001);
+
+    Ext extender (.imm_src(imm_src), .instr(instr), .shamt(shamt), .imm(ext_imm));
+
+    // Fetch Operand
+    wire [3:0] rs1 = instr[18:15];
+    wire [3:0] rs2 = instr[23:20];
+    wire [3:0] rd = instr[10:7];
+
+    RegisterFile #(
+                     .ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
+                     .clk(clk), .rst(rst),
+                     .wdata(wdata_regd), .waddr(rd),
+                     .raddr1(rs1), .rdata1(data_reg1),
+                     .raddr2(rs2), .rdata2(data_reg2),
+                     .wen(reg_write)
+                 );
+
+    // Exception handling
+    wire [31:0]mcause = ecall ? 32'd11 : 32'd0;
+
+    Csr csr (
+            .clk(clk), .rst(rst),
+            .addr(ext_imm), .csr_in(csr_in),
+            .csr_out(csr_out), .csr_wen(csr_wen),
+            .exception(ecall), .exception_pc(pc_val), .exception_cause(mcause),
+            .mtvec(mtvec), .mepc(mepc)
+        );
+
+    // Decode control signal
 
     InstrType instr_type;
     MuxKey #(10,7,3) instr_type_mux(
@@ -36,23 +83,16 @@ module CtrlUnit(
                    7'b1110011, I_TYPE  // I-type system instr
                }
            );
+
     // Extend imm based on instruction type
-    assign imm_src = instr_type;
+    InstrType imm_src = instr_type;
 
     // Itype: lw(add for address), I/R type arithmetic, jalr/csrrw(don't use alu to calculate)
     wire [3:0]srial = (func3==3'b101)? {func7, func3} : {1'b0, func3};
     wire [3:0]itype_ctrl = (opcode==7'b0000011) ? 4'b0000 : srial;
-    wire [3:0]btype_ctrl;
-    MuxKey #(5,3,4) alu_ctrl_mux(
-               alu_ctrl, instr_type, {
-                   U_TYPE, ADD,         
-                   I_TYPE, itype_ctrl,
-                   R_TYPE, {func7,func3},// arithmetic
-                   B_TYPE, btype_ctrl,   // branch condition
-                   S_TYPE, ADD           // address
-               }
-           );
 
+    // Btype: reuse alu to calculate signal
+    wire [3:0]btype_ctrl;
     MuxKey #(6, 4, 4) btype_ctrl_mux(
                btype_ctrl, btype_branch, {
                    BEQ,  SUB,
@@ -64,23 +104,34 @@ module CtrlUnit(
                }
            );
 
-    // for lui & auipc special case 
-    wire [1:0] u_srca = (opcode == 7'b0110111) ? 2'b01 : 2'b10;
-    wire shamtr_srca = (opcode == 7'b0110011 && (func3 == 3'b101 || func3 == 3'b001));
+    MuxKey #(5,3,4) alu_ctrl_mux(
+               alu_ctrl, instr_type, {
+                   U_TYPE, ADD,
+                   I_TYPE, itype_ctrl,
+                   R_TYPE, {func7,func3},// arithmetic
+                   B_TYPE, btype_ctrl,   // branch condition
+                   S_TYPE, ADD           // address
+               }
+           );
+
+    // lui & auipc special case
+    wire [1:0] utype_srca = (opcode == 7'b0110111) ? 2'b01 : 2'b10;
+
     // J-type don't use alu
     MuxKey #(5,3,2) alu_srca_mux(
                alu_srca, instr_type, {
                    I_TYPE, 2'b00,   // rs1
                    R_TYPE, 2'b00,   // rs1
                    B_TYPE, 2'b00,   // rs1
-                   U_TYPE, u_srca,  // zero / pc
+                   U_TYPE, utype_srca,  // zero / pc
                    S_TYPE, 2'b00    // rs1
                }
            );
 
+    wire shamtr_srcb = (opcode == 7'b0110011 && (func3 == 3'b101 || func3 == 3'b001));
     MuxKey #(5,3,2) alu_srcb_mux(
                alu_srcb, instr_type, {
-                   R_TYPE, shamtr_srca ? 2'b10 : 2'b00, // rs2
+                   R_TYPE, shamtr_srcb ? 2'b10 : 2'b00,
                    B_TYPE, 2'b0, // rs2
                    I_TYPE, 2'b1, // imm
                    U_TYPE, 2'b1, // imm
@@ -89,7 +140,9 @@ module CtrlUnit(
            );
 
     // ecall/mret instr don't write register
-    wire itype_reg_write = (ecall || mret) ? 1'b0 : 1'b1; 
+    wire reg_write;
+    wire itype_reg_write = (ecall || mret) ? 1'b0 : 1'b1;
+
     MuxKey #(6,3,1) reg_write_mux(
                reg_write, instr_type, {
                    I_TYPE, itype_reg_write,
@@ -114,6 +167,7 @@ module CtrlUnit(
            );
 
     wire [3:0]system_branch = (ecall || mret) ? (ecall ? ECALL : MRET) : NO;
+
     MuxKey #(4, 7, 4) branch_mux(
                branch, opcode, {
                    7'b1101111, JAL,
@@ -134,16 +188,17 @@ module CtrlUnit(
            );
 
     MuxKey #(1, 7, 1) mem_wen_mux(
-        mem_wen, opcode, {
-            7'b0100011, 1'b1
-        }
-    );
+               mem_wen, opcode, {
+                   7'b0100011, 1'b1
+               }
+           );
 
+    wire csr_wen;
     MuxKey #(1, 7, 1) csr_wen_mux(
-        csr_wen, opcode, {
-            7'b1110011, mret? 1'b0 : 1'b1
-        }
-    );
+               csr_wen, opcode, {
+                   7'b1110011, mret? 1'b0 : 1'b1
+               }
+           );
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

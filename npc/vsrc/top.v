@@ -8,194 +8,64 @@ module top (
         input clk,
         input rst);
 
-    // PC signal
-    wire [31:0]snpc;
     wire [31:0]next_pc;
     wire [31:0]pc_val;
-    reg [31:0]instr;
+    wire [31:0]instr;
+
+    IFU ifu(
+            .clk(clk), .rst(rst), 
+            .next_pc(next_pc), 
+            .pc_val(pc_val), .instr(instr)
+    );
 
     // Control signal
-    InstrType imm_src;
     AluCtrl alu_ctrl;
     wire [1:0]alu_srca;
     wire [1:0]alu_srcb;
+    wire [2:0]mem_width;
     Branch branch;
-    wire reg_write;
     wire [1:0]write_src;
     wire mem_wen;
-    wire csr_wen;
-    wire ecall;
-    wire mret;
+    wire valid;
 
-    // Operand
+    // Operand / Writeback result
     wire [31:0]data_reg1, data_reg2, wdata_regd;
     wire [31:0]ext_imm;
 
-    // PC register
-    Reg #( .WIDTH(32), .RESET_VAL(32'h80000000) ) pc (
-            .clk(clk), .rst(rst),
-            .din(next_pc), .dout(pc_val), .wen(1'b1)
-        );
-
-    // fetch instruction
-    always @(*) begin
-        instr = pmem_read(pc_val);
-    end
-
-    // ebreak: stop similation
-    always begin
-        if(instr == 32'h00100073)
-            set_finish();
-    end
-
-    // extract operand & opcode/func
-    wire [3:0] rs1 = instr[18:15];
-    wire [3:0] rs2 = instr[23:20];
-    wire [3:0] rd = instr[10:7];
-    wire [2:0] func3 = instr[14:12];
-    wire [11:0] func12 = instr[31:20];
-    wire func7 = instr[30];
-    wire [6:0] opcode = instr[6:0];
-
-    CtrlUnit ctrl (.opcode(opcode), .func3(func3), .func7(func7), .func12(func12), .imm_src(imm_src), .reg_write(reg_write), .branch(branch), .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), .write_src(write_src), .mem_wen(mem_wen), .csr_wen(csr_wen), .ecall(ecall), .mret(mret));
-
-    Ext extender (.imm_src(imm_src), .instr(instr), .imm(ext_imm));
-
     wire [31:0]csr_out;
+    wire [31:0]csr_in;
     wire [31:0]mtvec;
     wire [31:0]mepc;
-    wire [31:0]mcause = ecall ? 32'd11 : 32'd0;
-    wire [31:0]csr_in = func3 == 3'b010 ? data_reg1 | csr_out : data_reg1;
-    Csr csr (.clk(clk), .rst(rst), .addr(ext_imm), .csr_in(data_reg1), .csr_out(csr_out), .csr_wen(csr_wen), .exception(ecall), .exception_pc(pc_val), .exception_cause(mcause), .mtvec(mtvec), .mepc(mepc));
 
-    RegisterFile #(.ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
-                    .clk(clk), .wdata(wdata_regd), .rst(rst),
-                    .waddr(rd), .raddr1(rs1), .rdata1(data_reg1),
-                    .raddr2(rs2), .rdata2(data_reg2), .wen(reg_write)
-                );
-
-    wire [31:0]opl;
-    MuxKey #(3, 2, 32) op1 (
-                opl, alu_srca,{
-                    2'b00, data_reg1,
-                    2'b01, 32'b0,
-                    2'b10, pc_val                                   
-                }
-            );
-
-    wire [31:0]opr;
-    MuxKey #(3, 2, 32) op2 (
-                opr, alu_srcb, {
-                    2'b00, data_reg2,
-                    2'b01, ext_imm,
-                    2'b10, data_reg2 & 32'h0000001f
-                }
-            );
+    IDU idu (
+            .instr(instr), .pc_val(pc_val), 
+            .wdata_regd(wdata_regd), .csr_in(csr_in), 
+            .clk(clk), .rst(rst), 
+            .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
+            .branch(branch), .write_src(write_src), 
+            .mem_wen(mem_wen), .valid(valid), .mem_width(mem_width),
+            .ext_imm(ext_imm), .data_reg1(data_reg1), .data_reg2(data_reg2), 
+            .csr_out(csr_out), .mepc(mepc), .mtvec(mtvec)
+    );
 
     wire [31:0]alu_res;
-    Alu alu(.alu_ctrl(alu_ctrl), .a(opl), .b(opr), .result(alu_res));
-
-    // Memory access 
-    reg [31:0] rdata;
-
-    wire valid = ((opcode == 7'b0000011) || (opcode == 7'b0100011));
-    wire [31:0] raddr = alu_res;
-    wire [31:0] waddr = alu_res;
-    wire [31:0] wdata = data_reg2;
-
-    // Generate wmask based on which part of the 4 bytes need to write
-    wire [7:0] wmask;
-    wire [7:0] sb_mask = (8'b00000001 << waddr[1:0]);
-    wire [7:0] sh_mask = (waddr[1:0] == 2'b00) ? 8'b00000011 : 
-                    (waddr[1:0] == 2'b10) ? 8'b00001100 : 
-                    8'b00000000; 
-                    
-    wire [7:0] sw_mask = 8'b00001111;
-
-    MuxKey #(3, 3, 8) wmask_mux(
-        wmask, func3, {
-            3'b000, sb_mask,
-            3'b001, sh_mask,
-            3'b010, sw_mask
-        }
+    EXU exu(
+            .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
+            .alu_ctrl(alu_ctrl), 
+            .data_reg1(data_reg1), .data_reg2(data_reg2), 
+            .pc_val(pc_val), .ext_imm(ext_imm), 
+            .alu_res(alu_res)
     );
 
-    // Asyn read/write for now (need to configure for difftest IO), filter illegal access when mtrace
-    always @(*) begin
-        if (valid != 1'b0) begin // 有读写请求时
-            rdata = pmem_read(raddr);
-            if (mem_wen && clk == 1'b0) begin // 有写请求时
-            pmem_write(waddr, wdata, wmask);
-            end
-        end
-        else begin
-            rdata = 0;
-        end
-    end
-
-        // Extract data from 4 bytes based on address
-    wire [31:0] mask_data;
-
-    wire [7:0] lb_data = (raddr[1:0] == 2'b00) ? rdata[7:0]  :
-                    (raddr[1:0] == 2'b01) ? rdata[15:8] :
-                    (raddr[1:0] == 2'b10) ? rdata[23:16] :
-                                            rdata[31:24];
-
-    wire [15:0] lh_data = (raddr[1:0] == 2'b00) ? rdata[15:0] :
-                    (raddr[1:0] == 2'b10) ? rdata[31:16] :
-                                            16'b0;
-
-    MuxKey #(5, 3, 32) mask_data_mux(
-        mask_data, func3, {
-            3'b000, {{24{lb_data[7]}}, lb_data}, 
-            3'b001, {{16{lh_data[15]}}, lh_data},
-            3'b010, rdata,                    
-            3'b100, {{24{1'b0}}, lb_data}, 
-            3'b101, {{16{1'b0}}, lh_data}  
-        }
-    );
-
-    // Update pc
-    assign snpc = pc_val + 32'd4;
-
-    wire [31:0]lt_triggered = (alu_res == 1) ? pc_val+ext_imm : snpc;
-    wire [31:0]lt_untriggered = (alu_res != 1) ? pc_val+ext_imm : snpc;
-    wire [31:0]triggered = (alu_res == 0) ? pc_val+ext_imm : snpc;
-    wire [31:0]untriggered = (alu_res != 0) ? pc_val+ext_imm : snpc;
-
-    MuxKey #(11, 4, 32) next_pc_mux(
-        next_pc, branch, {
-            NO,    snpc,
-            JAL,   pc_val + ext_imm,
-            JALR,  (data_reg1 + ext_imm)&~1,
-            BEQ,   triggered,
-            BNE,   untriggered,
-            BLT,   lt_triggered,
-            BGE,   lt_untriggered,
-            BLTU,  lt_triggered, 
-            BGEU,  lt_untriggered,
-            ECALL, mtvec,
-            MRET,  mepc
-        }
-    );
-
-    // Reg Write
-    wire [31:0] link_alu_csr;
-    MuxKey #(3,2,32) write_data_mux(
-        link_alu_csr, write_src, {
-            2'b00, alu_res,
-            2'b01, snpc,   // jal&jalr
-            2'b10, csr_out  // csr
-        }
-    );
-
-    // not optimal encode
-    MuxKey #(2, 1, 32) wdata_regd_mux(
-        wdata_regd, valid, {
-            1'b0, link_alu_csr,
-            1'b1, mask_data // lw result
-        }
-    );
+    WBU wbu(
+        .clk(clk), 
+        .valid(valid), .mem_wen(mem_wen), 
+        .mem_width(mem_width), .branch(branch), .write_src(write_src), 
+        .alu_res(alu_res), .ext_imm(ext_imm), .pc_val(pc_val),  
+        .data_reg1(data_reg1), .data_reg2(data_reg2), 
+        .mepc(mepc), .mtvec(mtvec), .csr_out(csr_out), 
+        .next_pc(next_pc), .wdata_regd(wdata_regd), .csr_in(csr_in)
+        );
 
     function automatic int get_dnpc();
         get_dnpc = next_pc;

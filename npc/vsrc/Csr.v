@@ -3,7 +3,6 @@ module Csr (
   input rst,
   input [31:0] addr,
   input [31:0] csr_in,
-  output reg [31:0] csr_out,
   input csr_wen,
 
   input        exception,    
@@ -11,17 +10,18 @@ module Csr (
   input [31:0] exception_cause,
 
   output reg [31:0]mtvec,
-  output reg [31:0]mepc
+  output reg [31:0]mepc,
+  output reg [31:0] csr_out
 );
   reg [31:0]mstatus;
   reg [31:0]mcause;
 
   always @(posedge clk) begin
     if (rst) begin 
-      mstatus <= 32'h1800;  // 初始值
-      mtvec   <= 32'h0;     // 初始化 mtvec 
-      mepc    <= 32'h0;     // 初始化 mepc  
-      mcause  <= 32'h0;     // 初始化 mcause  
+      mstatus <= 32'h1800;  
+      mtvec   <= 32'h0;     
+      mepc    <= 32'h0;      
+      mcause  <= 32'h0;   
     end
     else if(exception)begin 
       mcause <= exception_cause;

@@ -10,17 +10,16 @@ module RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
         input wen
     );
     reg [DATA_WIDTH-1:0] rf [2**ADDR_WIDTH-1:0];
-    wire write_enable;
-    wire [31:0]zero_reg=32'h00000000;
-
-    // $0 always keep zero
-    assign write_enable = wen & (waddr != 0);
 
     always @(posedge clk) begin
         if (write_enable && ~rst)
             rf[waddr] <= wdata;
     end
 
+    // $0 always keep zero
+    wire write_enable = wen & (waddr != 0);
+
+    wire [31:0]zero_reg=32'h00000000;
     assign rdata1 = raddr1 == 0 ? zero_reg : rf[raddr1];
     assign rdata2 = raddr2 == 0 ? zero_reg : rf[raddr2];
 
@@ -118,7 +117,6 @@ module RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
         end
     endfunction
 
-    // 将此函数导出给 C++ 调用
     export "DPI-C" function get_reg_val_by_abi;
 
 endmodule
