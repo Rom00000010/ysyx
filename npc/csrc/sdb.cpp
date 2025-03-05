@@ -3,7 +3,7 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 
-bool is_batch_mode = false;
+bool is_batch_mode = true;
 extern bool stop;
 void cpu_exec(unsigned int n);
 void init_regex();

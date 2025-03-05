@@ -4,18 +4,19 @@ module IDU(
         input clk,
         input rst,
         input [31:0]instr,
-        input [31:0]pc_val,
+        input [31:0]pc,
         input [31:0]wdata_regd,
         input [31:0]csr_in,
 
         output AluCtrl alu_ctrl,
         output [1:0]alu_srca,
         output [1:0]alu_srcb,
-        output [1:0]write_src,
+        output [1:0]wb_sel,
         output [2:0]mem_width,
-        output Branch branch,
+        output Branch branch_type,
         output mem_wen,
         output valid,
+        output csr_write_set,
 
         output [31:0]ext_imm,
         output [31:0]data_reg1,
@@ -57,12 +58,13 @@ module IDU(
 
     // Exception handling
     wire [31:0]mcause = ecall ? 32'd11 : 32'd0;
+    assign csr_write_set = (func3 == 3'b010);
 
     Csr csr (
             .clk(clk), .rst(rst),
             .addr(ext_imm), .csr_in(csr_in),
             .csr_out(csr_out), .csr_wen(csr_wen),
-            .exception(ecall), .exception_pc(pc_val), .exception_cause(mcause),
+            .exception(ecall), .exception_pc(pc), .exception_cause(mcause),
             .mtvec(mtvec), .mepc(mepc)
         );
 
@@ -169,7 +171,7 @@ module IDU(
     wire [3:0]system_branch = (ecall || mret) ? (ecall ? ECALL : MRET) : NO;
 
     MuxKey #(4, 7, 4) branch_mux(
-               branch, opcode, {
+               branch_type, opcode, {
                    7'b1101111, JAL,
                    7'b1100111, JALR,
                    7'b1100011, btype_branch,
@@ -177,13 +179,12 @@ module IDU(
                }
            );
 
-    wire [1:0]alu_csr = (opcode == 7'b1110011) ? 2'b10 : 2'b00;
-
-    MuxKey #(3, 4, 2) write_src_mux(
-               write_src, branch, {
-                   NO, alu_csr,   // alu_res or csr
-                   JAL, 2'b01,   // pc+4 for link
-                   JALR, 2'b01
+    MuxKeyWithDefault #(4, 7, 2) wb_sel_mux(
+               wb_sel, opcode, 2'b00, {
+                   7'b1110011, 2'b10,   // csr
+                   7'b1101111, 2'b01,   // pc+4 for link
+                   7'b1100111, 2'b01,
+                   7'b0000011, 2'b11    // load memory
                }
            );
 

@@ -8,14 +8,13 @@ module top (
         input clk,
         input rst);
 
-    wire [31:0]next_pc;
-    wire [31:0]pc_val;
+    wire [31:0]pc;
     wire [31:0]instr;
 
     IFU ifu(
             .clk(clk), .rst(rst), 
-            .next_pc(next_pc), 
-            .pc_val(pc_val), .instr(instr)
+            .branch_taken(branch_taken), .branch_target(branch_target), 
+            .pc(pc), .instr(instr)
     );
 
     // Control signal
@@ -23,10 +22,11 @@ module top (
     wire [1:0]alu_srca;
     wire [1:0]alu_srcb;
     wire [2:0]mem_width;
-    Branch branch;
-    wire [1:0]write_src;
+    Branch branch_type;
+    wire [1:0]wb_sel;
     wire mem_wen;
     wire valid;
+    wire csr_write_set;
 
     // Operand / Writeback result
     wire [31:0]data_reg1, data_reg2, wdata_regd;
@@ -38,37 +38,46 @@ module top (
     wire [31:0]mepc;
 
     IDU idu (
-            .instr(instr), .pc_val(pc_val), 
+            .instr(instr), .pc(pc), 
             .wdata_regd(wdata_regd), .csr_in(csr_in), 
             .clk(clk), .rst(rst), 
             .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
-            .branch(branch), .write_src(write_src), 
+            .branch_type(branch_type), .wb_sel(wb_sel), 
             .mem_wen(mem_wen), .valid(valid), .mem_width(mem_width),
             .ext_imm(ext_imm), .data_reg1(data_reg1), .data_reg2(data_reg2), 
-            .csr_out(csr_out), .mepc(mepc), .mtvec(mtvec)
+            .csr_out(csr_out), .mepc(mepc), .mtvec(mtvec), .csr_write_set(csr_write_set)
     );
 
     wire [31:0]alu_res;
+    wire branch_taken;
+    wire [31:0]branch_target;
+    wire [31:0]raddr;
+    wire [31:0]waddr;
+    wire [31:0]wdata;
+    wire [7:0]wmask;
     EXU exu(
             .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
-            .alu_ctrl(alu_ctrl), 
+            .alu_ctrl(alu_ctrl), .branch_type(branch_type), .mem_width(mem_width),
             .data_reg1(data_reg1), .data_reg2(data_reg2), 
-            .pc_val(pc_val), .ext_imm(ext_imm), 
-            .alu_res(alu_res)
+            .pc(pc), .ext_imm(ext_imm), 
+            .mepc(mepc), .mtvec(mtvec),
+            .alu_res(alu_res), .branch_taken(branch_taken), .branch_target(branch_target),
+            .raddr(raddr), .waddr(waddr), .wdata(wdata), .wmask(wmask)
     );
 
     WBU wbu(
         .clk(clk), 
         .valid(valid), .mem_wen(mem_wen), 
-        .mem_width(mem_width), .branch(branch), .write_src(write_src), 
-        .alu_res(alu_res), .ext_imm(ext_imm), .pc_val(pc_val),  
-        .data_reg1(data_reg1), .data_reg2(data_reg2), 
-        .mepc(mepc), .mtvec(mtvec), .csr_out(csr_out), 
-        .next_pc(next_pc), .wdata_regd(wdata_regd), .csr_in(csr_in)
+        .wb_sel(wb_sel), .csr_write_set(csr_write_set), .mem_width(mem_width),
+        .alu_res(alu_res),  .pc(pc),  
+        .data_reg1(data_reg1), 
+        .waddr(waddr), .raddr(raddr), .wdata(wdata), .wmask(wmask),
+        .csr_out(csr_out), 
+        .wdata_regd(wdata_regd), .csr_in(csr_in)
         );
 
     function automatic int get_dnpc();
-        get_dnpc = next_pc;
+        get_dnpc = branch_target;
     endfunction
 
     function automatic int get_instr();
@@ -76,7 +85,7 @@ module top (
     endfunction
 
     function automatic int get_pc_val();
-        get_pc_val = pc_val;
+        get_pc_val = pc;
     endfunction
 
     export "DPI-C" function get_dnpc;
