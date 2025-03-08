@@ -8,7 +8,7 @@ module IFU(
     );
 
     // PC register
-    Reg #( 
+    Reg #(
             .WIDTH(32), .RESET_VAL(32'h80000000) ) pc_reg (
             .clk(clk), .rst(rst),
             .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(1'b1)
@@ -16,7 +16,10 @@ module IFU(
 
     // Fetch instruction
     always @(*) begin
-        instr = pmem_read(pc);
+        instr <= pmem_read(pc);
+    end
+
+    always @(*) begin
         // ebreak: stop similation
         if(instr == 32'h00100073)
             set_finish();

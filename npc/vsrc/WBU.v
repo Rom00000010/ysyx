@@ -1,5 +1,6 @@
 module WBU(
     input clk,
+    input rst,
 
     input valid,
     input mem_wen,
@@ -22,7 +23,7 @@ module WBU(
 
     // Asyn read/write for now (need to configure for difftest IO), filter illegal access when mtrace
     always @(*) begin
-        if (valid != 1'b0) begin // 有读写请求时
+        if (valid != 1'b0 && !rst) begin // 有读写请求时
             rdata = pmem_read(raddr);
             if (mem_wen && clk == 1'b0) begin // 有写请求时
             pmem_write(waddr, wdata, wmask);

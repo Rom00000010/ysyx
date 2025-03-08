@@ -149,7 +149,7 @@ void step_and_dump_wave(unsigned int n)
             ftrace(get_pc_val(), get_instr());
         }
         sim_time++;
-        //tfp->dump(sim_time);
+        tfp->dump(sim_time);
     }
 }
 
@@ -157,11 +157,11 @@ void sim_init()
 {
     // create simulate context, dut and dump wave
     contextp = new VerilatedContext;
-    //contextp->traceEverOn(true);
-    //tfp = new VerilatedFstC;
+    contextp->traceEverOn(true);
+    tfp = new VerilatedFstC;
     top = new Vtop;
-    //top->trace(tfp, 99);
-    //tfp->open("dump.fst");
+    top->trace(tfp, 99);
+    tfp->open("dump.fst");
 }
 
 void single_cycle()
@@ -169,12 +169,12 @@ void single_cycle()
     top->clk = 0;
     top->eval();
     sim_time++;
-    //tfp->dump(sim_time);
+    tfp->dump(sim_time);
 
     top->clk = 1;
     top->eval();
     sim_time++;
-    //tfp->dump(sim_time);
+    tfp->dump(sim_time);
 }
 
 void reset(int n)

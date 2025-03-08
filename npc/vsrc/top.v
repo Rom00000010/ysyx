@@ -66,7 +66,7 @@ module top (
     );
 
     WBU wbu(
-        .clk(clk), 
+        .clk(clk), .rst(rst),
         .valid(valid), .mem_wen(mem_wen), 
         .wb_sel(wb_sel), .csr_write_set(csr_write_set), .mem_width(mem_width),
         .alu_res(alu_res),  .pc(pc),  
