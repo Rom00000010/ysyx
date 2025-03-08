@@ -3,6 +3,14 @@
 module IDU(
         input clk,
         input rst,
+
+        input ifu_valid,
+        output reg idu_ready,
+
+        output reg idu_valid,
+        input exu_ready,
+        input wbu_valid,
+
         input [31:0]instr,
         input [31:0]pc,
         input [31:0]wdata_regd,
@@ -23,13 +31,29 @@ module IDU(
         output [31:0]data_reg2,
         output [31:0]csr_out,
         output [31:0]mepc,
-        output [31:0]mtvec
+        output [31:0]mtvec,
+        output [31:0]pc_handshake
     );
 
-    wire [2:0] func3 = instr[14:12];
-    wire [11:0] func12 = instr[31:20];
-    wire func7 = instr[30];
-    wire [6:0] opcode = instr[6:0];
+    always @(*) begin
+        if(rst) begin
+            idu_ready = 1'b0;
+            idu_valid = 1'b0;
+        end
+
+        else begin
+            idu_ready = 1'b1;
+            idu_valid = idu_ready && ifu_valid;
+        end
+    end
+
+    assign pc_handshake = (idu_ready && ifu_valid) ? pc : 32'b0;
+    wire [31:0]instr_handshake = (idu_ready && ifu_valid) ? instr : 32'b0;
+
+    wire [2:0] func3 = instr_handshake[14:12];
+    wire [11:0] func12 = instr_handshake[31:20];
+    wire func7 = instr_handshake[30];
+    wire [6:0] opcode = instr_handshake[6:0];
 
     // load, store, ecall or mret
     assign valid = ((opcode == 7'b0000011) || (opcode == 7'b0100011));
@@ -40,12 +64,12 @@ module IDU(
     // Extend immediate
     wire shamt = (opcode == 7'b0010011) && (func3 == 3'b101 || func3 == 3'b001);
 
-    Ext extender (.imm_src(imm_src), .instr(instr), .shamt(shamt), .imm(ext_imm));
+    Ext extender (.imm_src(imm_src), .instr(instr_handshake), .shamt(shamt), .imm(ext_imm));
 
     // Fetch Operand
-    wire [3:0] rs1 = instr[18:15];
-    wire [3:0] rs2 = instr[23:20];
-    wire [3:0] rd = instr[10:7];
+    wire [3:0] rs1 = instr_handshake[18:15];
+    wire [3:0] rs2 = instr_handshake[23:20];
+    wire [3:0] rd = instr_handshake[10:7];
 
     RegisterFile #(
                      .ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
@@ -53,7 +77,7 @@ module IDU(
                      .wdata(wdata_regd), .waddr(rd),
                      .raddr1(rs1), .rdata1(data_reg1),
                      .raddr2(rs2), .rdata2(data_reg2),
-                     .wen(reg_write)
+                     .wen(reg_write && wbu_valid && idu_ready)
                  );
 
     // Exception handling
@@ -63,8 +87,8 @@ module IDU(
     Csr csr (
             .clk(clk), .rst(rst),
             .addr(ext_imm), .csr_in(csr_in),
-            .csr_out(csr_out), .csr_wen(csr_wen),
-            .exception(ecall), .exception_pc(pc), .exception_cause(mcause),
+            .csr_out(csr_out), .csr_wen(csr_wen && wbu_valid && idu_ready),
+            .exception(ecall), .exception_pc(pc_handshake), .exception_cause(mcause),
             .mtvec(mtvec), .mepc(mepc)
         );
 
@@ -180,13 +204,13 @@ module IDU(
            );
 
     MuxKeyWithDefault #(4, 7, 2) wb_sel_mux(
-               wb_sel, opcode, 2'b00, {
-                   7'b1110011, 2'b10,   // csr
-                   7'b1101111, 2'b01,   // pc+4 for link
-                   7'b1100111, 2'b01,
-                   7'b0000011, 2'b11    // load memory
-               }
-           );
+                          wb_sel, opcode, 2'b00, {
+                              7'b1110011, 2'b10,   // csr
+                              7'b1101111, 2'b01,   // pc+4 for link
+                              7'b1100111, 2'b01,
+                              7'b0000011, 2'b11    // load memory
+                          }
+                      );
 
     MuxKey #(1, 7, 1) mem_wen_mux(
                mem_wen, opcode, {
