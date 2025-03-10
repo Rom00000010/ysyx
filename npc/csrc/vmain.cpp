@@ -50,6 +50,7 @@ void set_finish()
     if (get_reg_val_by_abi("a0") == 0)
     {
         cout << "\033[1;32m" << "HIT GOOD TRAP" << "\033[0m" << endl;
+        printf("total cycles: %lld\n", total_cycles);
         exit(0);
     }
     else
@@ -351,6 +352,5 @@ int main(int argc, char **argv)
     sdb_mainloop();
 
     // tfp->close();
-    printf("total cycles: %lld\n", total_cycles);
     return 0;
 }

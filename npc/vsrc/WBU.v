@@ -40,18 +40,16 @@ module WBU(
         end
     end
 
-    // Asyn read/write for now (need to configure for difftest IO), filter illegal access when mtrace
-    always @(*) begin
-        if (valid != 1'b0 && !rst) begin // 有读写请求时
-            rdata = pmem_read(raddr);
-            if (mem_wen && clk == 1'b0) begin // 有写请求时
-                pmem_write(waddr, wdata, wmask);
-            end
-        end
-        else begin
-            rdata = 0;
-        end
-    end
+    wire [31:0]trash;
+    RegisterFile #(
+                     .ADDR_WIDTH(8), .DATA_WIDTH(32)) regfile (
+                     .clk(clk), .rst(rst),
+                     .wdata(wdata), .waddr(waddr[7:0]),
+                     .raddr1(raddr[7:0]), .rdata1(rdata),
+                     .raddr2(8'b0), .rdata2(trash),
+                     .wen(mem_wen)
+                 );
+
 
     // Memory read, Extract data from 4 bytes based on address
     reg [31:0] rdata;

@@ -21,33 +21,15 @@ module IFU(
             .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(exu_valid && ifu_ready)
         );
 
-    reg req;
-    wire [31:0]data;
-    wire ready;
-
-    Sram sram(
-        .clk(clk), .rst(rst),
-        .addr(pc), .req(req), .ready(ready), .data(data)
-    );
-
-    // Fetch instruction
-    always @(posedge clk) begin
-        if(rst) begin
-            req <= 1'b1;
-        end
-        else if(exu_valid && ifu_ready)
-            req <= 1'b1;
-        else
-            req <= 1'b0;
-    end
-
-    assign instr = data;
-
-    always @(*) begin
-        // ebreak: stop similation
-        if(instr == 32'h00100073)
-            set_finish();
-    end
+    wire [31:0]trash;
+    RegisterFile #(
+                     .ADDR_WIDTH(8), .DATA_WIDTH(32)) regfile (
+                     .clk(clk), .rst(rst),
+                     .wdata(32'd1), .waddr(8'd5),
+                     .raddr1(pc[7:0]), .rdata1(instr),
+                     .raddr2(8'd5), .rdata2(trash),
+                     .wen(1'b0)
+                 );
 
     always @(*) begin
         if(rst) begin
@@ -55,7 +37,7 @@ module IFU(
             ifu_ready = 1'b0;
         end
         else begin
-            ifu_valid = ready;
+            ifu_valid = 1'b1;
             ifu_ready = 1'b1;
         end
     end

@@ -1,6 +1,6 @@
 `include "common.vh"
 /* verilator lint_off UNUSEDSIGNAL */
-module IDU(
+module IDU (
         input clk,
         input rst,
 
@@ -16,12 +16,12 @@ module IDU(
         input [31:0]wdata_regd,
         input [31:0]csr_in,
 
-        output AluCtrl alu_ctrl,
+        output logic[3:0] alu_ctrl,
         output [1:0]alu_srca,
         output [1:0]alu_srcb,
         output [1:0]wb_sel,
         output [2:0]mem_width,
-        output Branch branch_type,
+        output logic[3:0] branch_type,
         output mem_wen,
         output valid,
         output csr_write_set,
