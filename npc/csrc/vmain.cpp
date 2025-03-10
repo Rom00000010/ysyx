@@ -20,6 +20,7 @@ bool finish = false;
 bool stop = false;
 
 long start_time;
+long long total_cycles = 0;
 
 vector<uint32_t> mem(32 * 1024 * 1024);
 void sdb_mainloop();
@@ -35,12 +36,12 @@ void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
 
-long get_elapsed_microseconds() {
+long get_elapsed_microseconds()
+{
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000000 + tv.tv_usec;
 }
-
 
 void set_finish()
 {
@@ -69,8 +70,8 @@ extern "C" int pmem_read(int raddr)
     }
 #endif
     // Timer access
-    if(raddr == 0xa0000048)
-    {   
+    if (raddr == 0xa0000048)
+    {
         difftest_skip_ref();
         long end_time = get_elapsed_microseconds();
         return end_time - start_time;
@@ -96,12 +97,11 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask)
 #endif
     // Serial port access
     if (waddr == 0xa00003f8)
-    {   
+    {
         difftest_skip_ref();
         putchar(wdata);
         fflush(stdout);
         return;
-
     }
 
     waddr &= ~0x3u;
@@ -146,23 +146,24 @@ void step_and_dump_wave(unsigned int n)
         if (top->clk == 0)
         {
             SET_TOP
-            if(get_instr() != 0x00000000)
+            if (get_instr() != 0x00000000)
                 ftrace(get_pc_val(), get_instr());
         }
         sim_time++;
-        tfp->dump(sim_time);
+        //tfp->dump(sim_time);
     }
+    total_cycles += 1;
 }
 
 void sim_init()
 {
     // create simulate context, dut and dump wave
     contextp = new VerilatedContext;
-    contextp->traceEverOn(true);
-    tfp = new VerilatedFstC;
+    //contextp->traceEverOn(true);
+    //tfp = new VerilatedFstC;
     top = new Vtop;
-    top->trace(tfp, 99);
-    tfp->open("dump.fst");
+    //top->trace(tfp, 99);
+    //tfp->open("dump.fst");
 }
 
 void single_cycle()
@@ -170,12 +171,12 @@ void single_cycle()
     top->clk = 0;
     top->eval();
     sim_time++;
-    tfp->dump(sim_time);
+    //tfp->dump(sim_time);
 
     top->clk = 1;
     top->eval();
     sim_time++;
-    tfp->dump(sim_time);
+    //tfp->dump(sim_time);
 }
 
 void reset(int n)
@@ -309,7 +310,7 @@ void cpu_exec(unsigned int n)
     {
         SET_TOP
         uint32_t instr = get_instr();
-        if(instr == 0x00000000)
+        if (instr == 0x00000000)
         {
             cnt++;
             step_and_dump_wave(2);
@@ -319,16 +320,16 @@ void cpu_exec(unsigned int n)
         {
             cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
             cout << setw(8) << setfill('0') << hex << instr << " ";
-            disassembleAndPrint(instr, log_buf, 1);
+            //disassembleAndPrint(instr, log_buf, 1);
         }
-        sprintf(log_buf, "0x%08x: %08x\t", get_pc_val(), instr);
-        disassembleAndPrint(instr, log_buf, 0);
-        writeBuffer(log_buf);
+        //sprintf(log_buf, "0x%08x: %08x\t", get_pc_val(), instr);
+        //disassembleAndPrint(instr, log_buf, 0);
+        //writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        difftest_step(get_pc_val());
+        // difftest_step(get_pc_val());
 
-        watchpoint_inspect();
+        // watchpoint_inspect();
     }
 }
 
@@ -349,6 +350,7 @@ int main(int argc, char **argv)
 
     sdb_mainloop();
 
-    //tfp->close();
+    // tfp->close();
+    printf("total cycles: %lld\n", total_cycles);
     return 0;
 }
