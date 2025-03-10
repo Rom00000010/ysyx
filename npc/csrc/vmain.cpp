@@ -146,7 +146,8 @@ void step_and_dump_wave(unsigned int n)
         if (top->clk == 0)
         {
             SET_TOP
-            ftrace(get_pc_val(), get_instr());
+            if(get_instr() != 0x00000000)
+                ftrace(get_pc_val(), get_instr());
         }
         sim_time++;
         tfp->dump(sim_time);
@@ -308,6 +309,12 @@ void cpu_exec(unsigned int n)
     {
         SET_TOP
         uint32_t instr = get_instr();
+        if(instr == 0x00000000)
+        {
+            cnt++;
+            step_and_dump_wave(2);
+            continue;
+        }
         if (n <= 10)
         {
             cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
@@ -319,7 +326,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        // difftest_step(get_pc_val());
+        difftest_step(get_pc_val());
 
         watchpoint_inspect();
     }

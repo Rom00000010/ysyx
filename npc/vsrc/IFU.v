@@ -21,10 +21,27 @@ module IFU(
             .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(exu_valid && ifu_ready)
         );
 
+    reg req;
+    wire [31:0]data;
+    wire ready;
+
+    Sram sram(
+        .clk(clk), .rst(rst),
+        .addr(pc), .req(req), .ready(ready), .data(data)
+    );
+
     // Fetch instruction
-    always @(*) begin
-        instr = pmem_read(pc);
+    always @(posedge clk) begin
+        if(rst) begin
+            req <= 1'b1;
+        end
+        else if(exu_valid && ifu_ready)
+            req <= 1'b1;
+        else
+            req <= 1'b0;
     end
+
+    assign instr = data;
 
     always @(*) begin
         // ebreak: stop similation
@@ -38,7 +55,7 @@ module IFU(
             ifu_ready = 1'b0;
         end
         else begin
-            ifu_valid = 1'b1;
+            ifu_valid = ready;
             ifu_ready = 1'b1;
         end
     end
