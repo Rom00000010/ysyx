@@ -24,6 +24,7 @@ module top (
             .clk(clk), .rst(rst), 
             .ifu_valid(ifu_valid), .idu_ready(idu_ready),
             .exu_valid(exu_valid), .ifu_ready(ifu_ready),
+            .wbu_valid(wbu_valid),
             .branch_taken(branch_taken), .branch_target(branch_target), 
             .pc(pc), .instr(instr)
     );

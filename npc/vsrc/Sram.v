@@ -18,7 +18,7 @@ module Sram(
         end
         else begin
             ready <= 1'b0;
-            data <= 32'h0;
+            data <= data;
         end
 
     end

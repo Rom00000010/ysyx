@@ -47,8 +47,8 @@ module IDU(
         end
     end
 
-    assign pc_handshake = (idu_ready && ifu_valid) ? pc : 32'b0;
-    wire [31:0]instr_handshake = (idu_ready && ifu_valid) ? instr : 32'b0;
+    assign pc_handshake = pc;
+    wire [31:0]instr_handshake = instr;
 
     wire [2:0] func3 = instr_handshake[14:12];
     wire [11:0] func12 = instr_handshake[31:20];
@@ -224,6 +224,12 @@ module IDU(
                    7'b1110011, mret? 1'b0 : 1'b1
                }
            );
+
+    function automatic int is_mem_read();
+        is_mem_read = {31'b0, valid && !mem_wen};
+    endfunction
+
+    export "DPI-C" function is_mem_read;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

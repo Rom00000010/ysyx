@@ -4,6 +4,8 @@ module IFU(
         input rst,
         input idu_ready,
         output reg ifu_valid,
+
+        input wbu_valid,
         input exu_valid,
         output reg ifu_ready,
 
@@ -18,7 +20,7 @@ module IFU(
     Reg #(
             .WIDTH(32), .RESET_VAL(32'h80000000) ) pc_reg (
             .clk(clk), .rst(rst),
-            .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(exu_valid && ifu_ready)
+            .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(ifu_ready && wbu_valid)
         );
 
     reg req;
@@ -35,7 +37,7 @@ module IFU(
         if(rst) begin
             req <= 1'b1;
         end
-        else if(exu_valid && ifu_ready)
+        else if(wbu_valid && ifu_ready)
             req <= 1'b1;
         else
             req <= 1'b0;
@@ -59,6 +61,12 @@ module IFU(
             ifu_ready = 1'b1;
         end
     end
+
+    function automatic int get_ifu_valid();
+        get_ifu_valid = {31'b0, ifu_valid};
+    endfunction
+
+    export "DPI-C" function get_ifu_valid;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

@@ -13,6 +13,7 @@ VerilatedContext *contextp = NULL;
 // VerilatedVcdC *tfp = NULL;
 VerilatedFstC *tfp = NULL;
 Vtop *top;
+svScope scope;
 
 vluint64_t sim_time = 0;
 int depth = 0;
@@ -50,11 +51,13 @@ void set_finish()
     if (get_reg_val_by_abi("a0") == 0)
     {
         cout << "\033[1;32m" << "HIT GOOD TRAP" << "\033[0m" << endl;
+        tfp->close();
         exit(0);
     }
     else
     {
         cout << "\033[1;31m" << "HIT BAD TRAP" << "\033[0m" << endl;
+        tfp->close();
         printBuffer();
         exit(1);
     }
@@ -150,7 +153,7 @@ void step_and_dump_wave(unsigned int n)
                 ftrace(get_pc_val(), get_instr());
         }
         sim_time++;
-        //tfp->dump(sim_time);
+        tfp->dump(sim_time);
     }
     total_cycles += 1;
 }
@@ -159,11 +162,11 @@ void sim_init()
 {
     // create simulate context, dut and dump wave
     contextp = new VerilatedContext;
-    //contextp->traceEverOn(true);
-    //tfp = new VerilatedFstC;
+    contextp->traceEverOn(true);
+    tfp = new VerilatedFstC;
     top = new Vtop;
-    //top->trace(tfp, 99);
-    //tfp->open("dump.fst");
+    top->trace(tfp, 99);
+    tfp->open("dump.fst");
 }
 
 void single_cycle()
@@ -171,12 +174,12 @@ void single_cycle()
     top->clk = 0;
     top->eval();
     sim_time++;
-    //tfp->dump(sim_time);
+    tfp->dump(sim_time);
 
     top->clk = 1;
     top->eval();
     sim_time++;
-    //tfp->dump(sim_time);
+    tfp->dump(sim_time);
 }
 
 void reset(int n)
@@ -310,7 +313,15 @@ void cpu_exec(unsigned int n)
     {
         SET_TOP
         uint32_t instr = get_instr();
-        if (instr == 0x00000000)
+        SET_IFU
+        uint32_t ifu_valid = get_ifu_valid();
+        SET_WBU
+        uint32_t mem_ready = get_mem_ready();
+        SET_IDU
+        uint32_t mem_read = is_mem_read();
+        SET_TOP
+        // Skip internal cycle(don't cause state change)
+        if (!ifu_valid && !mem_ready || mem_read && !mem_ready)
         {
             cnt++;
             step_and_dump_wave(2);
@@ -320,16 +331,16 @@ void cpu_exec(unsigned int n)
         {
             cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
             cout << setw(8) << setfill('0') << hex << instr << " ";
-            //disassembleAndPrint(instr, log_buf, 1);
+            disassembleAndPrint(instr, log_buf, 1);
         }
-        //sprintf(log_buf, "0x%08x: %08x\t", get_pc_val(), instr);
-        //disassembleAndPrint(instr, log_buf, 0);
-        //writeBuffer(log_buf);
+        sprintf(log_buf, "0x%08x: %08x\t", get_pc_val(), instr);
+        disassembleAndPrint(instr, log_buf, 0);
+        writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        // difftest_step(get_pc_val());
+        difftest_step(get_pc_val());
 
-        // watchpoint_inspect();
+        watchpoint_inspect();
     }
 }
 
@@ -350,7 +361,6 @@ int main(int argc, char **argv)
 
     sdb_mainloop();
 
-    // tfp->close();
     printf("total cycles: %lld\n", total_cycles);
     return 0;
 }

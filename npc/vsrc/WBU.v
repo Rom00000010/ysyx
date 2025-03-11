@@ -29,29 +29,31 @@ module WBU(
         output [31:0]csr_in
    );
 
+    wire not_ld = (idu_valid && exu_valid && wbu_ready) && !(valid && !mem_wen);
     always @(*) begin
         if(rst) begin
             wbu_valid = 1'b0;
             wbu_ready = 1'b0;
         end
         else begin
-            wbu_valid = idu_valid && exu_valid && wbu_ready;
+            wbu_valid = not_ld || ready;
             wbu_ready = 1'b1;
         end
     end
 
-    // Asyn read/write for now (need to configure for difftest IO), filter illegal access when mtrace
-    always @(*) begin
-        if (valid != 1'b0 && !rst) begin // 有读写请求时
-            rdata = pmem_read(raddr);
-            if (mem_wen && clk == 1'b0) begin // 有写请求时
-                pmem_write(waddr, wdata, wmask);
-            end
-        end
-        else begin
-            rdata = 0;
-        end
-    end
+    wire ready;
+    LSU lsu(
+        .clk(clk),
+        .rst(rst),
+        .addr(raddr),
+        .req(valid && !mem_wen && idu_valid),
+        .ready(ready),
+        .data(rdata),
+        .wdata(wdata),
+        .wmask(wmask),
+        .waddr(waddr),
+        .wen(mem_wen)
+    );
 
     // Memory read, Extract data from 4 bytes based on address
     reg [31:0] rdata;
@@ -90,6 +92,12 @@ module WBU(
 
     // mem_width actually is func3, distinguish csrrw/csrrs
     assign csr_in = csr_write_set ? data_reg1 | csr_out : data_reg1;
+
+    function automatic int get_mem_ready();
+        get_mem_ready = {31'b0, ready};
+    endfunction
+
+    export "DPI-C" function get_mem_ready;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

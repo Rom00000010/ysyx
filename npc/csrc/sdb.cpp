@@ -5,6 +5,7 @@
 
 bool is_batch_mode = true;
 extern bool stop;
+extern svScope scope;
 void cpu_exec(unsigned int n);
 void init_regex();
 void init_wp_pool();

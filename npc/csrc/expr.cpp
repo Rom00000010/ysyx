@@ -3,6 +3,7 @@
 #include <regex.h>
 #include <iostream>
 
+extern svScope scope;
 int pmem_read(int addr);
 
 enum
