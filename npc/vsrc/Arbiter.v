@@ -95,8 +95,7 @@ module Arbiter(
             IDLE: begin
                 if (ifu_arvalid && mem_arready && wbu_awvalid && wbu_wvalid && mem_awready && mem_wready) begin
                     // Both requesting - use round robin
-                    next_state = last_grant_ifu ? WBU_WRITE : IF
-U_READ;
+                    next_state = last_grant_ifu ? WBU_WRITE : IFU_READ;
                 end
                 else if (ifu_arvalid && mem_arready && wbu_arvalid && mem_arready) begin
                     // Both want to read - use round robin
@@ -160,30 +159,37 @@ U_READ;
                 wbu_arready = mem_arready;
                 wbu_awready = mem_awready;
                 wbu_wready = mem_wready;
+
+                // TODO: HANDLE SIMULTANEOUSLY ACCESS CASE
+                if(ifu_arvalid && mem_arready) begin
+                    mem_arvalid = 1;
+                    mem_araddr = ifu_araddr;
+                end
+                else if(wbu_awvalid && mem_awready && wbu_wvalid && mem_wready) begin
+                    mem_awvalid = 1;
+                    mem_awaddr = wbu_awaddr;
+                    mem_wvalid = 1;
+                    mem_wdata = wbu_wdata;
+                    mem_wstrb = wbu_wstrb;
+                end
+                else if(wbu_arvalid && mem_arready) begin
+                    mem_arvalid = 1;
+                    mem_araddr = wbu_araddr;
+                end
             end
             IFU_READ: begin
-                mem_arvalid = 1;
-                mem_araddr = ifu_araddr;
                 mem_rready = ifu_rready;
                 ifu_rvalid = mem_rvalid;
                 ifu_rdata = mem_rdata;
                 ifu_rresp = mem_rresp;
             end
             WBU_READ: begin
-                mem_arvalid = 1;
-                mem_araddr = wbu_araddr;
                 mem_rready = wbu_rready;
                 wbu_rvalid = mem_rvalid;
                 wbu_rdata = mem_rdata;
                 wbu_rresp = mem_rresp;
             end
             WBU_WRITE: begin
-                mem_awvalid = 1;
-                mem_awaddr = wbu_awaddr;
-                mem_wvalid = 1;
-                mem_wdata = wbu_wdata;
-                mem_wstrb = wbu_wstrb;
-
                 mem_bready = wbu_bready;
                 wbu_bvalid = mem_bvalid;
                 wbu_bresp = mem_bresp;

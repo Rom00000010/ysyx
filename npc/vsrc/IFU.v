@@ -89,6 +89,7 @@ module IFU(
                     if(wbu_valid && ifu_ready) begin
                         arvalid <= 1'b1;
                         rready <= 1'b1;
+                        araddr <= branch_taken ? branch_target : pc+4;
                         instr <= 32'h0;
                     end
                 end

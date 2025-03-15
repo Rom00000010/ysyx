@@ -57,13 +57,18 @@ void set_finish()
     if (get_reg_val_by_abi("a0") == 0)
     {
         cout << "\033[1;32m" << "HIT GOOD TRAP" << "\033[0m" << endl;
+#ifndef CONFIG_PERF_MODE
         tfp->close();
+#endif
         exit(0);
     }
+
     else
     {
         cout << "\033[1;31m" << "HIT BAD TRAP" << "\033[0m" << endl;
+#ifndef CONFIG_PERF_MODE
         tfp->close();
+#endif
         printBuffer();
         exit(1);
     }
@@ -162,20 +167,25 @@ void step_and_dump_wave(unsigned int n)
             }
         }
         sim_time++;
+#ifndef CONFIG_PERF_MODE
         tfp->dump(sim_time);
+#endif
     }
     total_cycles += 1;
 }
 
 void sim_init()
 {
-    // Create simulate context, dut and dump wave
     contextp = new VerilatedContext;
+#ifndef CONFIG_PERF_MODE
     contextp->traceEverOn(true);
     tfp = new VerilatedFstC;
     top = new Vtop;
     top->trace(tfp, 99);
     tfp->open("dump.fst");
+#else
+    top = new Vtop;
+#endif
 }
 
 void single_cycle()
@@ -183,12 +193,16 @@ void single_cycle()
     top->clk = 0;
     top->eval();
     sim_time++;
+#ifndef CONFIG_PERF_MODE
     tfp->dump(sim_time);
+#endif
 
     top->clk = 1;
     top->eval();
     sim_time++;
+#ifndef CONFIG_PERF_MODE
     tfp->dump(sim_time);
+#endif
 }
 
 void reset(int n)
@@ -315,7 +329,10 @@ void ftrace(uint32_t pc, uint32_t instr)
 }
 
 void cpu_exec(unsigned int n)
-{   
+{
+#ifdef CONFIG_PERF_MODE
+    while(1) step_and_dump_wave(2);
+#else
     unsigned int cnt = n;
     char log_buf[100];
     while (!finish && cnt-- && !stop)
@@ -348,6 +365,7 @@ void cpu_exec(unsigned int n)
 
         watchpoint_inspect();
     }
+#endif
 }
 
 int main(int argc, char **argv)
@@ -373,7 +391,9 @@ int main(int argc, char **argv)
 
     printf("total cycles: %lld\n", total_cycles);
 
+#ifndef CONFIG_PERF_MODE
     tfp->close();
+#endif
     top->final();
     delete top;
     delete contextp;

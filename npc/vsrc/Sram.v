@@ -1,3 +1,4 @@
+/* verilator lint_off UNUSEDSIGNAL */
 module Sram(
         input clk,
         input rst,
@@ -30,12 +31,6 @@ module Sram(
         input bready
     );
 
-    wire [3:0] lfsr_out;
-    Lfsr lfsr(
-             .clk(clk), .rst(rst),
-             .seed(4'b1), .lfsr_out(lfsr_out)
-         );
-
     // State encoding
     localparam IDLE = 3'd0;
     localparam READ_EXECUTE = 3'd1;
@@ -49,10 +44,10 @@ module Sram(
     reg [31:0] addr_reg;      // Address register
     reg [31:0] wdata_reg;     // Write data register
     reg [7:0] wstrb_reg;      // Write mask register
-    reg [3:0] read_delay;     // Counter for read delay
+    reg [3:0] read_delay;     // Read delay register
     reg [3:0] write_delay;
     reg [3:0] addr_delay;
-
+    
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= IDLE;
@@ -68,16 +63,16 @@ module Sram(
 
         case (state)
             IDLE: begin
-                if (arvalid && arready && read_delay == 4'd0) begin
+                if (arvalid && arready && addr_delay == 4'd0) begin
                     next_state = READ_EXECUTE;
                 end
-                else if (awvalid && wvalid && awready && wready && write_delay == 4'd0) begin
+                else if (awvalid && wvalid && awready && wready && addr_delay == 4'd0) begin
                     next_state = WRITE_EXECUTE;
                 end
             end
 
             READ_EXECUTE: begin
-                if (read_delay == 4'd0) begin
+                if(read_delay == 4'd0) begin
                     next_state = READ_RESP;
                 end
             end
@@ -145,8 +140,8 @@ module Sram(
                     end
                     // Latch address if read request
                     else if (arvalid && arready) begin
+                        read_delay <= 4'd0;
                         addr_reg <= araddr;
-                        read_delay <= lfsr_out; // Set initial delay value
                         arready <= 1'b0;
                     end
                     // Latch address and data if write request (simultaneous)
@@ -154,14 +149,14 @@ module Sram(
                         addr_reg <= awaddr;
                         wdata_reg <= wdata;
                         wstrb_reg <= wstrb;
-                        write_delay <= lfsr_out;
+                        write_delay <= 4'b0;
                         awready <= 1'b0;
                         wready <= 1'b0;
                     end
                 end
 
                 READ_EXECUTE: begin
-                    if (read_delay > 4'd0) begin
+                    if(read_delay > 4'd0) begin
                         read_delay <= read_delay - 4'd1;
                     end
                     else begin
@@ -174,7 +169,7 @@ module Sram(
                 READ_RESP: begin
                     if (rready && rvalid) begin
                         rvalid <= 1'b0;
-                        addr_delay <= lfsr_out;
+                        addr_delay <= 4'b0;
                     end
                 end
 
@@ -194,7 +189,7 @@ module Sram(
                 WRITE_RESP: begin
                     if (bready && bvalid) begin
                         bvalid <= 1'b0;
-                        addr_delay <= lfsr_out;
+                        addr_delay <= 4'b0;
                     end
                 end
 
@@ -204,3 +199,4 @@ module Sram(
         end
     end
 endmodule
+/* verilator lint_on UNUSEDSIGNAL */

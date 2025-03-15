@@ -127,6 +127,7 @@ module WBU(
                         wvalid <= 1'b0;
                     end
 
+                    // Actually equal with IFU fetch state logic
                     if(valid && !mem_wen && idu_valid) begin
                         arvalid <= 1'b1;
                         araddr <= raddr;

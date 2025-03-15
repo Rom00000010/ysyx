@@ -11,9 +11,10 @@
 #include <assert.h>
 #include <stdint.h>
 
-// #define CONFIG_WATCHPOINT
-// #define CONFIG_FTRACE
-// #define CONFIG_MTRACE
+//#define CONFIG_WATCHPOINT
+//#define CONFIG_FTRACE
+//#define CONFIG_MTRACE
+//#define CONFIG_PERF_MODE
 
 extern "C" int get_reg_val_by_abi(const char *abi_name);
 extern "C" void print_rf();
