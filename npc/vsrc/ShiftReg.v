@@ -1,6 +1,4 @@
-`timescale 1ns / 1ps
-
-module shift_reg #(parameter N=4)
+module ShiftReg #(parameter N=4)
     (
         input clk,
         input [2:0] ctrl,

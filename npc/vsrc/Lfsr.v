@@ -1,15 +1,13 @@
-`timescale 1ns / 1ps
-
-module linear_shift(
+module Lfsr(
     input clk,
-    input reset,
-    input [7:0] seed,
-    output [7:0] lfsr_out
+    input rst,
+    input [3:0] seed,
+    output [3:0] lfsr_out
 );
     reg [2:0] ctrl;
 
     // Instantiate the shift register
-    shift_reg #(.N(8)) my_shift_reg (
+    ShiftReg #(.N(4)) my_shift_reg (
         .clk(clk),
         .ctrl(ctrl),
         .data_in(seed),
@@ -19,10 +17,10 @@ module linear_shift(
 
     wire feedback;
 
-    assign feedback = lfsr_out[0] ^ lfsr_out[2] ^ lfsr_out[3] ^ lfsr_out[4];
+    assign feedback = lfsr_out[0] ^ lfsr_out[3];
 
-    always @(posedge clk, posedge reset) begin
-        if (reset) begin
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
             ctrl <= 3'b001;  // Load initial data into the shift register
         end else begin
             ctrl <= 3'b101;  // Shift right with instream

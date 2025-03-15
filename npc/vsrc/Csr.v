@@ -1,6 +1,7 @@
 module Csr (
   input clk,
   input rst,
+  
   input [31:0] addr,
   input [31:0] csr_in,
   input csr_wen,
@@ -16,7 +17,7 @@ module Csr (
   reg [31:0]mstatus;
   reg [31:0]mcause;
 
-  always @(posedge clk) begin
+  always @(posedge clk or posedge rst) begin
     if (rst) begin 
       mstatus <= 32'h1800;  
       mtvec   <= 32'h0;     

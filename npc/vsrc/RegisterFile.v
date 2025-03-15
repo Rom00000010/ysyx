@@ -11,9 +11,13 @@ module RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
     );
     reg [DATA_WIDTH-1:0] rf [2**ADDR_WIDTH-1:0];
 
-    always @(posedge clk) begin
-        if (write_enable && ~rst)
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            rf <= '{default: 0};
+        end
+        else if (write_enable) begin
             rf[waddr] <= wdata;
+        end
     end
 
     // $0 always keep zero

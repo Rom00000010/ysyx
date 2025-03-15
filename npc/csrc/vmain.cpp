@@ -6,11 +6,11 @@
 #include <iostream>
 #include <iomanip>
 #include <vector>
+#include <signal.h>
 
 using namespace std;
 
 VerilatedContext *contextp = NULL;
-// VerilatedVcdC *tfp = NULL;
 VerilatedFstC *tfp = NULL;
 Vtop *top;
 svScope scope;
@@ -19,6 +19,12 @@ vluint64_t sim_time = 0;
 int depth = 0;
 bool finish = false;
 bool stop = false;
+
+// Signal handler for CTRL+C
+void signal_handler(int signum) {
+    cout << "Ctrl-c Accepted" << endl;
+    stop = true;
+}
 
 long start_time;
 long long total_cycles = 0;
@@ -148,9 +154,12 @@ void step_and_dump_wave(unsigned int n)
 
         if (top->clk == 0)
         {
-            SET_TOP
-            if (get_instr() != 0x00000000)
+            SET_WBU
+            if (!wbu_skip())
+                {   
+                SET_TOP
                 ftrace(get_pc_val(), get_instr());
+            }
         }
         sim_time++;
         tfp->dump(sim_time);
@@ -160,7 +169,7 @@ void step_and_dump_wave(unsigned int n)
 
 void sim_init()
 {
-    // create simulate context, dut and dump wave
+    // Create simulate context, dut and dump wave
     contextp = new VerilatedContext;
     contextp->traceEverOn(true);
     tfp = new VerilatedFstC;
@@ -306,27 +315,24 @@ void ftrace(uint32_t pc, uint32_t instr)
 }
 
 void cpu_exec(unsigned int n)
-{
+{   
     unsigned int cnt = n;
     char log_buf[100];
     while (!finish && cnt-- && !stop)
     {
+        SET_WBU
+        uint32_t wbu = wbu_skip();
         SET_TOP
         uint32_t instr = get_instr();
-        SET_IFU
-        uint32_t ifu_valid = get_ifu_valid();
-        SET_WBU
-        uint32_t mem_ready = get_mem_ready();
-        SET_IDU
-        uint32_t mem_read = is_mem_read();
-        SET_TOP
+
         // Skip internal cycle(don't cause state change)
-        if (!ifu_valid && !mem_ready || mem_read && !mem_ready)
+        if (wbu)
         {
             cnt++;
             step_and_dump_wave(2);
             continue;
         }
+        
         if (n <= 10)
         {
             cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
@@ -345,7 +351,11 @@ void cpu_exec(unsigned int n)
 }
 
 int main(int argc, char **argv)
-{
+{   
+    // Capture Ctrl-c, stop simulation in time
+    signal(SIGINT, signal_handler);
+
+    // Initialize simulation
     sim_init();
 
     init_monitor(argc, argv, mem);
@@ -362,5 +372,10 @@ int main(int argc, char **argv)
     sdb_mainloop();
 
     printf("total cycles: %lld\n", total_cycles);
+
+    tfp->close();
+    top->final();
+    delete top;
+    delete contextp;
     return 0;
 }

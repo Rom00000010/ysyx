@@ -9,8 +9,6 @@ module EXU(
         output reg exu_valid,
         input wbu_ready,
 
-        input ifu_ready,
-
         input [1:0]alu_srca,
         input [1:0]alu_srcb,
         input [3:0]alu_ctrl,
@@ -36,12 +34,12 @@ module EXU(
 
     always @(*) begin
         if(rst) begin
-            exu_ready = 1'b0;
             exu_valid = 1'b0;
+            exu_ready = 1'b0;
         end
         else begin
-            exu_ready = 1'b1;
             exu_valid = idu_valid && exu_ready;
+            exu_ready = 1'b1;
         end
     end
 

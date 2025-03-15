@@ -20,6 +20,5 @@ extern "C" void print_rf();
 extern "C" int get_dnpc();
 extern "C" int get_instr();
 extern "C" int get_pc_val();
-extern "C" int get_ifu_valid();
-extern "C" int get_mem_ready();
-extern "C" int is_mem_read();
+extern "C" int ifu_skip();
+extern "C" int wbu_skip();
