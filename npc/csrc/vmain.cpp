@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <vector>
 #include <signal.h>
+#include <chrono>
 
 using namespace std;
 
@@ -329,9 +330,9 @@ void ftrace(uint32_t pc, uint32_t instr)
 }
 
 void cpu_exec(unsigned int n)
-{
+{   
 #ifdef CONFIG_PERF_MODE
-    while(1) step_and_dump_wave(2);
+    while(!stop) step_and_dump_wave(2);
 #else
     unsigned int cnt = n;
     char log_buf[100];
@@ -387,9 +388,15 @@ int main(int argc, char **argv)
 
     init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     sdb_mainloop();
 
-    printf("total cycles: %lld\n", total_cycles);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    
+    double sim_rate = total_cycles / elapsed.count();
+    std::cout << "仿真速率: " << sim_rate / 1e6 << " MHz" << std::endl;
 
 #ifndef CONFIG_PERF_MODE
     tfp->close();
