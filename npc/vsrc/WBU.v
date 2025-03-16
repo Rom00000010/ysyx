@@ -216,11 +216,6 @@ module WBU(
 
     // ==================================================================================
 
-    function automatic int wbu_skip();
-        wbu_skip = {31'b0, !(state == IDLE && wbu_valid == 1'b1)};
-    endfunction
-
-    export "DPI-C" function wbu_skip;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

@@ -1,12 +1,10 @@
 `include "common.vh"
 /* verilator lint_off UNUSEDSIGNAL */
-import "DPI-C" function void set_finish ();
-import "DPI-C" function int pmem_read(input int raddr);
-import "DPI-C" function void pmem_write(input int waddr, input int wdata, input byte wmask);
-
 module top (
         input clk,
-        input rst);
+        input rst,
+        output [31:0]pc_out,
+        output [31:0]instr_out);
 
     wire ifu_ready;
     wire ifu_valid;
@@ -18,7 +16,10 @@ module top (
     wire wbu_valid;
 
     wire [31:0]pc;
-    wire [31:0]instr;
+    wire [31:0]instr;   
+
+    assign pc_out = pc;
+    assign instr_out = instr;
 
     // IFU AXI signals
     wire [31:0] ifu_araddr;
@@ -242,22 +243,6 @@ module top (
         .bvalid(mem_bvalid),
         .bready(mem_bready)
     );
-
-    function automatic int get_dnpc();
-        get_dnpc = branch_target;
-    endfunction
-
-    function automatic int get_instr();
-        get_instr = instr;
-    endfunction
-
-    function automatic int get_pc_val();
-        get_pc_val = pc;
-    endfunction
-
-    export "DPI-C" function get_dnpc;
-    export "DPI-C" function get_instr;
-    export "DPI-C" function get_pc_val;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

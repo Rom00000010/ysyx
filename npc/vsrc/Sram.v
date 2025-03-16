@@ -112,7 +112,6 @@ module Sram(
 
             rresp <= 2'b00;
             bresp <= 2'b00;
-            rdata <= 32'b0;
 
             addr_reg <= 32'b0;
             wdata_reg <= 32'b0;
@@ -160,7 +159,6 @@ module Sram(
                         read_delay <= read_delay - 4'd1;
                     end
                     else begin
-                        rdata <= pmem_read(addr_reg);
                         rresp <= 2'b00;
                         rvalid <= 1'b1;
                     end
@@ -179,8 +177,6 @@ module Sram(
                     end
                     else begin
                         // Perform write
-                        pmem_write(addr_reg, wdata_reg, wstrb_reg);
-
                         bresp <= 2'b00;
                         bvalid <= 1'b1;
                     end
@@ -198,5 +194,16 @@ module Sram(
             endcase
         end
     end
+
+    wire [31:0]trash;
+    RegisterFile #(
+                     .ADDR_WIDTH(8), .DATA_WIDTH(32)) regfile (
+                     .clk(clk), .rst(rst),
+                     .wdata(wdata_reg), .waddr(addr_reg[7:0]),
+                     .raddr1(addr_reg[7:0]), .rdata1(rdata),
+                     .raddr2(8'b0), .rdata2(trash),
+                     .wen(rvalid && rready)
+                 );
+
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

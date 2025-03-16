@@ -115,13 +115,5 @@ module IFU(
             endcase
         end
     end
-
-    // Alarm simulation environment to stop for ebreak instruction
-    always @(*) begin
-        if(instr == 32'h00100073) begin
-            set_finish();
-        end
-    end
-
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */
