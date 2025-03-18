@@ -7,7 +7,26 @@
 
     module top (
             input clk,
-            input rst);
+            input rst,
+            // SoC AXI interface
+            output [31:0] soc_araddr,
+            output soc_arvalid,
+            input soc_arready,
+            input [31:0] soc_rdata,
+            input [1:0] soc_rresp,
+            input soc_rvalid,
+            output soc_rready,
+            output [31:0] soc_awaddr,
+            output soc_awvalid,
+            input soc_awready,
+            output [31:0] soc_wdata,
+            output [7:0] soc_wstrb,
+            output soc_wvalid,
+            input soc_wready,
+            input [1:0] soc_bresp,
+            input soc_bvalid,
+            output soc_bready
+    );
 
         wire ifu_ready;
         wire ifu_valid;
@@ -49,44 +68,6 @@
         wire [1:0] wbu_bresp;
         wire wbu_bready;
 
-        // SRAM AXI signals
-        wire [31:0] mem_araddr;
-        wire mem_arvalid;
-        wire mem_arready;
-        wire [31:0] mem_rdata;
-        wire [1:0] mem_rresp;
-        wire mem_rvalid;
-        wire mem_rready;
-        wire [31:0] mem_awaddr;
-        wire mem_awvalid;
-        wire mem_awready;
-        wire [31:0] mem_wdata;
-        wire [7:0] mem_wstrb;
-        wire mem_wvalid;
-        wire mem_wready;
-        wire [1:0] mem_bresp;
-        wire mem_bvalid;
-        wire mem_bready;
-
-        // UART AXI signals
-        wire [31:0] uart_araddr;
-        wire uart_arvalid;
-        wire uart_arready;
-        wire [31:0] uart_rdata;
-        wire [1:0] uart_rresp;
-        wire uart_rvalid;
-        wire uart_rready;
-        wire [31:0] uart_awaddr;
-        wire uart_awvalid;
-        wire uart_awready;
-        wire [31:0] uart_wdata;
-        wire [7:0] uart_wstrb;
-        wire uart_wvalid;
-        wire uart_wready;
-        wire [1:0] uart_bresp;
-        wire uart_bvalid;
-        wire uart_bready;
-
         // CLINT AXI signals
         wire [31:0] clint_araddr;
         wire clint_arvalid;
@@ -124,7 +105,7 @@
         wire [1:0] xbar_bresp;
         wire xbar_bvalid;
         wire xbar_bready;
-
+        
         IFU ifu(
                 .clk(clk), .rst(rst), 
                 .ifu_valid(ifu_valid), .idu_ready(idu_ready),
@@ -258,7 +239,7 @@
             .wbu_bvalid(wbu_bvalid),
             .wbu_bresp(wbu_bresp),
             .wbu_bready(wbu_bready),
-            // Connect to Xbar instead of SRAM
+            // Connect to Xbar
             .mem_araddr(xbar_araddr),
             .mem_arvalid(xbar_arvalid),
             .mem_arready(xbar_arready),
@@ -300,42 +281,24 @@
             .s_bresp(xbar_bresp),
             .s_bvalid(xbar_bvalid),
             .s_bready(xbar_bready),
-            // SRAM interface
-            .sram_araddr(mem_araddr),
-            .sram_arvalid(mem_arvalid),
-            .sram_arready(mem_arready),
-            .sram_rdata(mem_rdata),
-            .sram_rresp(mem_rresp),
-            .sram_rvalid(mem_rvalid),
-            .sram_rready(mem_rready),
-            .sram_awaddr(mem_awaddr),
-            .sram_awvalid(mem_awvalid),
-            .sram_awready(mem_awready),
-            .sram_wdata(mem_wdata),
-            .sram_wstrb(mem_wstrb),
-            .sram_wvalid(mem_wvalid),
-            .sram_wready(mem_wready),
-            .sram_bresp(mem_bresp),
-            .sram_bvalid(mem_bvalid),
-            .sram_bready(mem_bready),
-            // UART interface
-            .uart_araddr(uart_araddr),
-            .uart_arvalid(uart_arvalid),
-            .uart_arready(uart_arready),
-            .uart_rdata(uart_rdata),
-            .uart_rresp(uart_rresp),
-            .uart_rvalid(uart_rvalid),
-            .uart_rready(uart_rready),
-            .uart_awaddr(uart_awaddr),
-            .uart_awvalid(uart_awvalid),
-            .uart_awready(uart_awready),
-            .uart_wdata(uart_wdata),
-            .uart_wstrb(uart_wstrb),
-            .uart_wvalid(uart_wvalid),
-            .uart_wready(uart_wready),
-            .uart_bresp(uart_bresp),
-            .uart_bvalid(uart_bvalid),
-            .uart_bready(uart_bready),
+            // External SoC interface
+            .soc_araddr(soc_araddr),
+            .soc_arvalid(soc_arvalid),
+            .soc_arready(soc_arready),
+            .soc_rdata(soc_rdata),
+            .soc_rresp(soc_rresp),
+            .soc_rvalid(soc_rvalid),
+            .soc_rready(soc_rready),
+            .soc_awaddr(soc_awaddr),
+            .soc_awvalid(soc_awvalid),
+            .soc_awready(soc_awready),
+            .soc_wdata(soc_wdata),
+            .soc_wstrb(soc_wstrb),
+            .soc_wvalid(soc_wvalid),
+            .soc_wready(soc_wready),
+            .soc_bresp(soc_bresp),
+            .soc_bvalid(soc_bvalid),
+            .soc_bready(soc_bready),
             // CLINT interface
             .clint_araddr(clint_araddr),
             .clint_arvalid(clint_arvalid),
@@ -354,52 +317,6 @@
             .clint_bresp(clint_bresp),
             .clint_bvalid(clint_bvalid),
             .clint_bready(clint_bready)
-        );
-
-        // Single SRAM instance
-        Sram sram(
-            .clk(clk),
-            .rst(rst),
-            .araddr(mem_araddr),
-            .arvalid(mem_arvalid),
-            .arready(mem_arready),
-            .rdata(mem_rdata),
-            .rresp(mem_rresp),
-            .rvalid(mem_rvalid),
-            .rready(mem_rready),
-            .awaddr(mem_awaddr),
-            .awvalid(mem_awvalid),
-            .awready(mem_awready),
-            .wdata(mem_wdata),
-            .wstrb(mem_wstrb),
-            .wvalid(mem_wvalid),
-            .wready(mem_wready),
-            .bresp(mem_bresp),
-            .bvalid(mem_bvalid),
-            .bready(mem_bready)
-        );
-
-        // UART instance
-        Uart uart(
-            .clk(clk),
-            .rst(rst),
-            .araddr(uart_araddr),
-            .arvalid(uart_arvalid),
-            .arready(uart_arready),
-            .rdata(uart_rdata),
-            .rresp(uart_rresp),
-            .rvalid(uart_rvalid),
-            .rready(uart_rready),
-            .awaddr(uart_awaddr),
-            .awvalid(uart_awvalid),
-            .awready(uart_awready),
-            .wdata(uart_wdata),
-            .wstrb(uart_wstrb[3:0]),
-            .wvalid(uart_wvalid),
-            .wready(uart_wready),
-            .bresp(uart_bresp),
-            .bvalid(uart_bvalid),
-            .bready(uart_bready)
         );
 
         // CLINT instance

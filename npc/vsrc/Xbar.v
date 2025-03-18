@@ -22,43 +22,24 @@ module Xbar (
         output reg s_bvalid,
         input s_bready,
 
-        // SRAM interface
-        output reg [31:0] sram_araddr,
-        output reg sram_arvalid,
-        input sram_arready,
-        input [31:0] sram_rdata,
-        input [1:0] sram_rresp,
-        input sram_rvalid,
-        output reg sram_rready,
-        output reg [31:0] sram_awaddr,
-        output reg sram_awvalid,
-        input sram_awready,
-        output reg [31:0] sram_wdata,
-        output reg [7:0] sram_wstrb,
-        output reg sram_wvalid,
-        input sram_wready,
-        input [1:0] sram_bresp,
-        input sram_bvalid,
-        output reg sram_bready,
-
-        // UART interface
-        output reg [31:0] uart_araddr,
-        output reg uart_arvalid,
-        input uart_arready,
-        input [31:0] uart_rdata,
-        input [1:0] uart_rresp,
-        input uart_rvalid,
-        output reg uart_rready,
-        output reg [31:0] uart_awaddr,
-        output reg uart_awvalid,
-        input uart_awready,
-        output reg [31:0] uart_wdata,
-        output reg [7:0] uart_wstrb,
-        output reg uart_wvalid,
-        input uart_wready,
-        input [1:0] uart_bresp,
-        input uart_bvalid,
-        output reg uart_bready,
+        // External SoC interface
+        output reg [31:0] soc_araddr,
+        output reg soc_arvalid,
+        input soc_arready,
+        input [31:0] soc_rdata,
+        input [1:0] soc_rresp,
+        input soc_rvalid,
+        output reg soc_rready,
+        output reg [31:0] soc_awaddr,
+        output reg soc_awvalid,
+        input soc_awready,
+        output reg [31:0] soc_wdata,
+        output reg [7:0] soc_wstrb,
+        output reg soc_wvalid,
+        input soc_wready,
+        input [1:0] soc_bresp,
+        input soc_bvalid,
+        output reg soc_bready,
 
         // CLINT interface
         output reg [31:0] clint_araddr,
@@ -81,45 +62,23 @@ module Xbar (
     );
 
     // Address decoding - only based on address values
-    wire is_uart_addr = (s_araddr == 32'ha00003f8) || (s_awaddr == 32'ha00003f8);
-    wire is_sram_addr = (s_araddr >= 32'h80000000) || (s_awaddr >= 32'h80000000);
     wire is_clint_addr = (s_araddr >= 32'ha0000048 && s_araddr <= 32'ha000004c) || (s_awaddr >= 32'ha0000048 && s_awaddr <= 32'ha000004c);
+    wire is_soc_addr = !is_clint_addr;  // All non-CLINT addresses go to SoC
 
     // Read channel routing
     always @(*) begin
-        sram_arvalid = 0;
-        uart_arvalid = 0;
         clint_arvalid = 0;
-        sram_araddr = 0;
-        uart_araddr = 0;
+        soc_arvalid = 0;
         clint_araddr = 0;
+        soc_araddr = 0;
         s_arready = 0;
         s_rvalid = 0;
         s_rdata = 0;
         s_rresp = 0;
-        sram_rready = 0;
-        uart_rready = 0;
         clint_rready = 0;
+        soc_rready = 0;
 
-        if (is_uart_addr) begin
-            uart_araddr = s_araddr;
-            uart_arvalid = s_arvalid;
-            s_arready = uart_arready;
-            s_rvalid = uart_rvalid;
-            s_rdata = uart_rdata;
-            s_rresp = uart_rresp;
-            uart_rready = s_rready;
-        end
-        else if (is_sram_addr) begin
-            sram_araddr = s_araddr;
-            sram_arvalid = s_arvalid;
-            s_arready = sram_arready;
-            s_rvalid = sram_rvalid;
-            s_rdata = sram_rdata;
-            s_rresp = sram_rresp;
-            sram_rready = s_rready;
-        end
-        else if (is_clint_addr) begin
+        if (is_clint_addr) begin
             clint_araddr = s_araddr;
             clint_arvalid = s_arvalid;
             s_arready = clint_arready;
@@ -127,6 +86,15 @@ module Xbar (
             s_rdata = clint_rdata;
             s_rresp = clint_rresp;
             clint_rready = s_rready;
+        end
+        else if (is_soc_addr) begin
+            soc_araddr = s_araddr;
+            soc_arvalid = s_arvalid;
+            s_arready = soc_arready;
+            s_rvalid = soc_rvalid;
+            s_rdata = soc_rdata;
+            s_rresp = soc_rresp;
+            soc_rready = s_rready;
         end else if (s_arvalid) begin
             // Invalid address
             s_arready = 1'b1;
@@ -137,54 +105,24 @@ module Xbar (
 
     // Write channel routing
     always @(*) begin
-        sram_awvalid = 0;
-        uart_awvalid = 0;
         clint_awvalid = 0;
-        uart_awaddr = 0;
-        sram_awaddr = 0;
+        soc_awvalid = 0;
         clint_awaddr = 0;
+        soc_awaddr = 0;
         s_awready = 0;
-        sram_wvalid = 0;
-        uart_wvalid = 0;
         clint_wvalid = 0;
+        soc_wvalid = 0;
         s_wready = 0;
         s_bvalid = 0;
         s_bresp = 0;
-        sram_bready = 0;
-        uart_bready = 0;
         clint_bready = 0;
-        sram_wdata = 0;
-        uart_wdata = 0;
+        soc_bready = 0;
         clint_wdata = 0;
-        sram_wstrb = 0;
-        uart_wstrb = 0;
+        soc_wdata = 0;
         clint_wstrb = 0;
+        soc_wstrb = 0;
 
-        if (is_uart_addr) begin
-            uart_awaddr = s_awaddr;
-            uart_awvalid = s_awvalid;
-            s_awready = uart_awready;
-            uart_wdata = s_wdata;
-            uart_wstrb = s_wstrb;
-            uart_wvalid = s_wvalid;
-            s_wready = uart_wready;
-            s_bvalid = uart_bvalid;
-            s_bresp = uart_bresp;
-            uart_bready = s_bready;
-        end
-        else if (is_sram_addr) begin
-            sram_awaddr = s_awaddr;
-            sram_awvalid = s_awvalid;
-            s_awready = sram_awready;
-            sram_wdata = s_wdata;
-            sram_wstrb = s_wstrb;
-            sram_wvalid = s_wvalid;
-            s_wready = sram_wready;
-            s_bvalid = sram_bvalid;
-            s_bresp = sram_bresp;
-            sram_bready = s_bready;
-        end
-        else if (is_clint_addr) begin
+        if (is_clint_addr) begin
             clint_awaddr = s_awaddr;
             clint_awvalid = s_awvalid;
             s_awready = clint_awready;
@@ -195,6 +133,18 @@ module Xbar (
             s_bvalid = clint_bvalid;
             s_bresp = clint_bresp;
             clint_bready = s_bready;
+        end
+        else if (is_soc_addr) begin
+            soc_awaddr = s_awaddr;
+            soc_awvalid = s_awvalid;
+            s_awready = soc_awready;
+            soc_wdata = s_wdata;
+            soc_wstrb = s_wstrb;
+            soc_wvalid = s_wvalid;
+            s_wready = soc_wready;
+            s_bvalid = soc_bvalid;
+            s_bresp = soc_bresp;
+            soc_bready = s_bready;
         end else if (s_awvalid || s_wvalid) begin
             // Invalid address
             s_awready = 1'b1;
