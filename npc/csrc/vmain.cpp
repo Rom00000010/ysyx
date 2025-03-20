@@ -44,7 +44,7 @@ void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
 extern "C" void flash_read(int32_t addr, int32_t *data) { assert(0); }
-extern "C" void mrom_read(int32_t addr, int32_t *data) { assert(0); }
+extern "C" void mrom_read(int32_t addr, int32_t *data) { *data = 0x00100073; }
 
 long get_elapsed_microseconds()
 {
@@ -389,7 +389,7 @@ int main(int argc, char **argv)
 
     start_time = get_elapsed_microseconds();
 
-    init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
+    // init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
 
     auto start = std::chrono::high_resolution_clock::now();
 

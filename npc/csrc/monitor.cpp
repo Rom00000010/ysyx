@@ -43,11 +43,11 @@ void img_init(int argc, char **argv, vector<uint32_t> &mem)
 
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem)
 {
-    img_init(argc, argv, mem);
+    // img_init(argc, argv, mem);
 
     init_sdb();
 
     initBuffer();
 
-    init_elf(argv[2]);
+    // init_elf(argv[2]);
 }

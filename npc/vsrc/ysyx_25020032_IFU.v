@@ -22,7 +22,7 @@ module ysyx_25020032_IFU(
     );
 
     // PC register
-    ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h80000000) ) pc_reg (
+    ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h2000_0000) ) pc_reg (
             .clk(clk), .rst(rst),
             .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
