@@ -1,4 +1,4 @@
-module Csr (
+module ysyx_25020032_Csr (
   input clk,
   input rst,
   
@@ -36,7 +36,7 @@ module Csr (
     end
   end
 
-  MuxKey #(4, 32, 32) out_mux(
+  ysyx_25020032_MuxKey #(4, 32, 32) out_mux(
     csr_out, addr, {
       32'h305, mtvec,
       32'h300, mstatus,

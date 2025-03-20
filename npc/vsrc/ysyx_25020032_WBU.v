@@ -1,5 +1,7 @@
 /* verilator lint_off UNUSEDSIGNAL */
-module WBU(
+`include "axi_interface.vh"
+
+module ysyx_25020032_WBU(
         input clk,
         input rst,
 
@@ -20,8 +22,8 @@ module WBU(
         input [31:0]data_reg1,
         input [31:0]raddr,
         input [31:0]waddr,
-        input [7:0]wmask,
-        input [31:0]wdata,
+        input [3:0]wmask,
+        input [31:0]wrdata,
         input [31:0]pc,
         input [31:0]csr_out,
 
@@ -29,23 +31,8 @@ module WBU(
         output [31:0]csr_in,
 
         // AXI interface
-        output reg [31:0] araddr,
-        output reg arvalid,
-        input arready,
-        input [31:0] rdata,
-        input [1:0] rresp,
-        input rvalid,
-        output reg rready,
-        output reg [31:0] awaddr,
-        output reg awvalid,
-        input awready,
-        output reg [31:0] wdata_out,
-        output reg [7:0] wstrb,
-        output reg wvalid,
-        input wready,
-        input [1:0] bresp,
-        input bvalid,
-        output reg bready
+        `AXI_MASTER_READ_ADDR_PORTS,
+        `AXI_MASTER_WRITE_ADDR_PORTS
    );
 
     wire not_ld = (idu_valid && exu_valid && wbu_ready) && !valid;
@@ -114,6 +101,16 @@ module WBU(
             wvalid <= 1'b0;
             mem_valid <= 1'b0;
             rdata_latch <= 32'b0;
+            // Set default values for AXI signals
+            arid <= `AXI_DEFAULT_ID;
+            arlen <= `AXI_DEFAULT_LEN;
+            arsize <= `AXI_DEFAULT_SIZE;
+            arburst <= `AXI_DEFAULT_BURST;
+            awid <= `AXI_DEFAULT_ID;
+            awlen <= `AXI_DEFAULT_LEN;
+            awsize <= `AXI_DEFAULT_SIZE;
+            awburst <= `AXI_DEFAULT_BURST;
+            wlast <= 1'b1;  // Single transfer
         end
         else begin
             case (state)
@@ -138,8 +135,8 @@ module WBU(
                         awvalid <= 1'b1;
                         awaddr <= waddr;
                         wvalid <= 1'b1;
-                        wdata_out <= wdata;
-                        wstrb <= wmask;
+                        wdata <= wdata;
+                        wstrb <= wmask[3:0];  // Convert 8-bit to 4-bit
                         bready <= 1'b1;
                     end
 
@@ -191,7 +188,7 @@ module WBU(
          (raddr[1:0] == 2'b10) ? rdata_latch[31:16] :
          16'b0;
 
-    MuxKey #(5, 3, 32) mask_data_mux(
+    ysyx_25020032_MuxKey #(5, 3, 32) mask_data_mux(
                mask_data, mem_width, {
                    3'b000, {{24{lb_data[7]}}, lb_data},
                    3'b001, {{16{lh_data[15]}}, lh_data},
@@ -203,7 +200,7 @@ module WBU(
 
     // ==================================================================================
 
-    MuxKey #(4, 2, 32) wdata_regd_mux(
+    ysyx_25020032_MuxKey #(4, 2, 32) wdata_regd_mux(
                wdata_regd, wb_sel, {
                    2'b00, alu_res,
                    2'b01, pc+4,

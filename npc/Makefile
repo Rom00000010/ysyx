@@ -24,6 +24,7 @@ VSRCS = $(shell find $(abspath ./vsrc) -name "*.v")
 CSRCS = $(shell find $(abspath ./csrc) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS := $(filter-out $(NPC_HOME)/csrc/vmain.cpp,$(CSRCS))
 CSRCS += $(SRC_AUTO_BIND)
+PERIP = $(shell find $(abspath ../ysyxSoC/perip) -name "*.v")
 
 # rules for NVBoard
 include $(NVBOARD_HOME)/scripts/nvboard.mk
@@ -50,7 +51,10 @@ clean:
 
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	verilator -MMD -Wall --cc vsrc/*.v -top top -I./include --trace-fst -j 0 --build \
+	verilator -MMD --trace-fst -j 0 --build --timescale "1ns/1ns" --no-timing \
+	--cc vsrc/*.v $(PERIP) ../ysyxSoC/build/ysyxSoCFull.v \
+	-top ysyxSoCFull \
+	-I./include -I../ysyxSoC/perip/uart16550/rtl -I../ysyxSoC/perip/spi/rtl \
 	-exe csrc/*.cpp -LDFLAGS "-lreadline -lcapstone" -CFLAGS "-I../include"
 
 include ../Makefile

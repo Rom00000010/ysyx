@@ -1,12 +1,12 @@
 `include "common.vh"
-module Alu(
+module ysyx_25020032_Alu(
         input AluCtrl alu_ctrl,
         input [31:0]a,
         input [31:0]b,
         output [31:0]result
     );
 
-    MuxKey #(10, 4, 32) alu_mux(
+    ysyx_25020032_MuxKey #(10, 4, 32) alu_mux(
         result, alu_ctrl, {
             ADD, a+b,
             SUB, a-b,

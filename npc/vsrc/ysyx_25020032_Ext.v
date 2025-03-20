@@ -1,6 +1,6 @@
 `include "common.vh"
 /* verilator lint_off UNUSEDSIGNAL */
-module Ext(
+module ysyx_25020032_Ext(
         input InstrType imm_src,
         input [31:0]instr,
         input shamt,
@@ -13,7 +13,7 @@ module Ext(
     wire [31:0] stype_imm = {{20{instr[31]}}, instr[31:25], instr[11:7]};
     wire [31:0] btype_imm = {{19{instr[31]}}, instr[31], instr[7], instr[30:25], instr[11:8], 1'b0};
 
-    MuxKey #(5, 3, 32) extender (
+    ysyx_25020032_MuxKey #(5, 3, 32) extender (
                imm, imm_src, {
                    I_TYPE, itype_imm,
                    U_TYPE, utype_imm,

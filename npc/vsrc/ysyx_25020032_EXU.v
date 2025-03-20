@@ -1,5 +1,5 @@
 /* verilator lint_off UNUSEDSIGNAL */
-module EXU(
+module ysyx_25020032_EXU(
         input clk,
         input rst,
 
@@ -29,7 +29,7 @@ module EXU(
         output [31:0]waddr,
         output [31:0]raddr,
         output [31:0]wdata,
-        output [7:0]wmask
+        output [3:0]wmask
     );
 
     always @(*) begin
@@ -44,7 +44,7 @@ module EXU(
     end
 
     wire [31:0]opl;
-    MuxKey #(3, 2, 32) op1 (
+    ysyx_25020032_MuxKey #(3, 2, 32) op1 (
                opl, alu_srca,{
                    2'b00, data_reg1,
                    2'b01, 32'b0,
@@ -53,7 +53,7 @@ module EXU(
            );
 
     wire [31:0]opr;
-    MuxKey #(3, 2, 32) op2 (
+    ysyx_25020032_MuxKey #(3, 2, 32) op2 (
                opr, alu_srcb, {
                    2'b00, data_reg2,
                    2'b01, ext_imm,
@@ -61,11 +61,11 @@ module EXU(
                }
            );
 
-    Alu alu(.alu_ctrl(alu_ctrl), .a(opl), .b(opr), .result(alu_res));
+    ysyx_25020032_Alu alu(.alu_ctrl(alu_ctrl), .a(opl), .b(opr), .result(alu_res));
 
     // Calculate whether branch taken and target address
 
-    MuxKey #(10, 4, 32) next_pc_mux(
+    ysyx_25020032_MuxKey #(10, 4, 32) next_pc_mux(
                branch_target, branch_type, {
                    JAL,   pc+ext_imm,
                    JALR,  (data_reg1 + ext_imm)&~1,
@@ -80,7 +80,7 @@ module EXU(
                }
            );
 
-    MuxKeyWithDefault #(10, 4, 1) branch_taken_mux(
+    ysyx_25020032_MuxKeyWithDefault #(10, 4, 1) branch_taken_mux(
                           branch_taken, branch_type, 0, {
                               BEQ,   alu_res == 0,
                               BNE,   alu_res!= 0,
@@ -101,14 +101,14 @@ module EXU(
     assign wdata = data_reg2;
 
     // Generate wmask based on which part of the 4 bytes need to write
-    wire [7:0] sb_mask = (8'b00000001 << waddr[1:0]);
-    wire [7:0] sh_mask = (waddr[1:0] == 2'b00) ? 8'b00000011 :
-         (waddr[1:0] == 2'b10) ? 8'b00001100 :
-         8'b00000000;
+    wire [3:0] sb_mask = (4'b0001 << waddr[1:0]);
+    wire [3:0] sh_mask = (waddr[1:0] == 2'b00) ? 4'b0011 :
+         (waddr[1:0] == 2'b10) ? 4'b1100 :
+         4'b0000;
 
-    wire [7:0] sw_mask = 8'b00001111;
+    wire [3:0] sw_mask = 4'b1111;
 
-    MuxKey #(3, 3, 8) wmask_mux(
+    ysyx_25020032_MuxKey #(3, 3, 4) wmask_mux(
                wmask, mem_width, {
                    3'b000, sb_mask,
                    3'b001, sh_mask,

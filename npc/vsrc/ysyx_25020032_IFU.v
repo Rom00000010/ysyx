@@ -1,5 +1,7 @@
 /* verilator lint_off UNUSEDSIGNAL */
-module IFU(
+`include "axi_interface.vh"
+
+module ysyx_25020032_IFU(
         input clk,
         input rst,
 
@@ -16,17 +18,11 @@ module IFU(
         output reg [31:0]instr,
 
         // AXI interface
-        output reg [31:0] araddr,
-        output reg arvalid,
-        input arready,
-        input [31:0] rdata,
-        input [1:0] rresp,
-        input rvalid,
-        output reg rready
+        `AXI_MASTER_READ_ADDR_PORTS
     );
 
     // PC register
-    Reg #(.WIDTH(32), .RESET_VAL(32'h80000000) ) pc_reg (
+    ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h80000000) ) pc_reg (
             .clk(clk), .rst(rst),
             .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
@@ -80,6 +76,11 @@ module IFU(
             ifu_valid <= 1'b0;
             ifu_ready <= 1'b0;
             instr <= 32'h0;
+            // Set default values for AXI signals
+            arid <= `AXI_DEFAULT_ID;
+            arlen <= `AXI_DEFAULT_LEN;
+            arsize <= `AXI_DEFAULT_SIZE;
+            arburst <= `AXI_DEFAULT_BURST;
         end
         else begin
             case (state)

@@ -13,7 +13,7 @@ using namespace std;
 
 VerilatedContext *contextp = NULL;
 VerilatedFstC *tfp = NULL;
-Vtop *top;
+VysyxSoCFull *top;
 svScope scope;
 
 vluint64_t sim_time = 0;
@@ -43,6 +43,8 @@ const char *func_name(uint32_t addr);
 void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
+extern "C" void flash_read(int32_t addr, int32_t *data) { assert(0); }
+extern "C" void mrom_read(int32_t addr, int32_t *data) { assert(0); }
 
 long get_elapsed_microseconds()
 {
@@ -155,10 +157,10 @@ void step_and_dump_wave(unsigned int n)
     {
         if (finish)
             break;
-        top->clk ^= 1;
+        top->clock ^= 1;
         top->eval();
 
-        if (top->clk == 0)
+        if (top->clock == 0)
         {
             SET_WBU
             if (!wbu_skip())
@@ -181,24 +183,24 @@ void sim_init()
 #ifndef CONFIG_PERF_MODE
     contextp->traceEverOn(true);
     tfp = new VerilatedFstC;
-    top = new Vtop;
+    top = new VysyxSoCFull;
     top->trace(tfp, 99);
     tfp->open("dump.fst");
 #else
-    top = new Vtop;
+    top = new VysyxSoCFull;
 #endif
 }
 
 void single_cycle()
 {
-    top->clk = 0;
+    top->clock = 0;
     top->eval();
     sim_time++;
 #ifndef CONFIG_PERF_MODE
     tfp->dump(sim_time);
 #endif
 
-    top->clk = 1;
+    top->clock = 1;
     top->eval();
     sim_time++;
 #ifndef CONFIG_PERF_MODE
@@ -208,10 +210,10 @@ void single_cycle()
 
 void reset(int n)
 {
-    top->rst = 1;
+    top->reset = 1;
     while (n-- > 0)
         single_cycle();
-    top->rst = 0;
+    top->reset = 0;
 }
 
 void disassembleAndPrint(uint32_t inst, char *buf, bool flag)
@@ -374,6 +376,7 @@ int main(int argc, char **argv)
     // Capture Ctrl-c, stop simulation in time
     signal(SIGINT, signal_handler);
 
+    Verilated::commandArgs(argc, argv);
     // Initialize simulation
     sim_init();
 

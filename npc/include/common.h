@@ -1,6 +1,6 @@
 #include "svdpi.h"
-#include "Vtop__Dpi.h"
-#include "Vtop.h"
+#include "VysyxSoCFull__Dpi.h"
+#include "VysyxSoCFull.h"
 #include "verilated_vcd_c.h"
 #include "verilated_fst_c.h"
 #include "verilated.h"

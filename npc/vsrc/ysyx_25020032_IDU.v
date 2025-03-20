@@ -1,6 +1,6 @@
 `include "common.vh"
 /* verilator lint_off UNUSEDSIGNAL */
-module IDU(
+module ysyx_25020032_IDU(
         input clk,
         input rst,
 
@@ -62,14 +62,14 @@ module IDU(
     // Extend immediate
     wire shamt = (opcode == 7'b0010011) && (func3 == 3'b101 || func3 == 3'b001);
 
-    Ext extender (.imm_src(imm_src), .instr(instr), .shamt(shamt), .imm(ext_imm));
+    ysyx_25020032_Ext extender (.imm_src(imm_src), .instr(instr), .shamt(shamt), .imm(ext_imm));
 
     // Fetch Operand
     wire [3:0] rs1 = instr[18:15];
     wire [3:0] rs2 = instr[23:20];
     wire [3:0] rd = instr[10:7];
 
-    RegisterFile #(.ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
+    ysyx_25020032_RegisterFile #(.ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
                      .clk(clk), .rst(rst),
                      .wdata(wdata_regd), .waddr(rd),
                      .raddr1(rs1), .rdata1(data_reg1),
@@ -81,7 +81,7 @@ module IDU(
     wire [31:0]mcause = ecall ? 32'd11 : 32'd0;
     assign csr_write_set = (func3 == 3'b010);
 
-    Csr csr (
+    ysyx_25020032_Csr csr (
             .clk(clk), .rst(rst),
             .addr(ext_imm), .csr_out(csr_out), 
             .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid && idu_ready),
@@ -92,7 +92,7 @@ module IDU(
     // Decode control signal
 
     InstrType instr_type;
-    MuxKey #(10,7,3) instr_type_mux(
+    ysyx_25020032_MuxKey #(10,7,3) instr_type_mux(
                instr_type, opcode, {
                    7'b0110111, U_TYPE, // U-type lui
                    7'b0110011, R_TYPE, // R-type arithmetic
@@ -116,7 +116,7 @@ module IDU(
 
     // Btype: reuse alu to calculate signal
     wire [3:0]btype_ctrl;
-    MuxKey #(6, 4, 4) btype_ctrl_mux(
+    ysyx_25020032_MuxKey #(6, 4, 4) btype_ctrl_mux(
                btype_ctrl, btype_branch, {
                    BEQ,  SUB,
                    BNE,  SUB,
@@ -127,7 +127,7 @@ module IDU(
                }
            );
 
-    MuxKey #(5,3,4) alu_ctrl_mux(
+    ysyx_25020032_MuxKey #(5,3,4) alu_ctrl_mux(
                alu_ctrl, instr_type, {
                    U_TYPE, ADD,
                    I_TYPE, itype_ctrl,
@@ -141,7 +141,7 @@ module IDU(
     wire [1:0] utype_srca = (opcode == 7'b0110111) ? 2'b01 : 2'b10;
 
     // J-type don't use alu
-    MuxKey #(5,3,2) alu_srca_mux(
+    ysyx_25020032_MuxKey #(5,3,2) alu_srca_mux(
                alu_srca, instr_type, {
                    I_TYPE, 2'b00,   // rs1
                    R_TYPE, 2'b00,   // rs1
@@ -152,7 +152,7 @@ module IDU(
            );
 
     wire shamtr_srcb = (opcode == 7'b0110011 && (func3 == 3'b101 || func3 == 3'b001));
-    MuxKey #(5,3,2) alu_srcb_mux(
+    ysyx_25020032_MuxKey #(5,3,2) alu_srcb_mux(
                alu_srcb, instr_type, {
                    R_TYPE, shamtr_srcb ? 2'b10 : 2'b00,
                    B_TYPE, 2'b0, // rs2
@@ -166,7 +166,7 @@ module IDU(
     wire reg_write;
     wire itype_reg_write = (ecall || mret) ? 1'b0 : 1'b1;
 
-    MuxKey #(6,3,1) reg_write_mux(
+    ysyx_25020032_MuxKey #(6,3,1) reg_write_mux(
                reg_write, instr_type, {
                    I_TYPE, itype_reg_write,
                    R_TYPE, 1'b1,
@@ -178,7 +178,7 @@ module IDU(
            );
 
     Branch btype_branch;
-    MuxKey #(6, 3, 4) btype_mux(
+    ysyx_25020032_MuxKey #(6, 3, 4) btype_mux(
                btype_branch, func3, {
                    3'b000, BEQ,
                    3'b001, BNE,
@@ -191,7 +191,7 @@ module IDU(
 
     wire [3:0]system_branch = (ecall || mret) ? (ecall ? ECALL : MRET) : NO;
 
-    MuxKey #(4, 7, 4) branch_mux(
+    ysyx_25020032_MuxKey #(4, 7, 4) branch_mux(
                branch_type, opcode, {
                    7'b1101111, JAL,
                    7'b1100111, JALR,
@@ -200,7 +200,7 @@ module IDU(
                }
            );
 
-    MuxKeyWithDefault #(4, 7, 2) wb_sel_mux(
+    ysyx_25020032_MuxKeyWithDefault #(4, 7, 2) wb_sel_mux(
                           wb_sel, opcode, 2'b00, {
                               7'b1110011, 2'b10,   // csr
                               7'b1101111, 2'b01,   // pc+4 for link
@@ -209,14 +209,14 @@ module IDU(
                           }
                       );
 
-    MuxKey #(1, 7, 1) mem_wen_mux(
+    ysyx_25020032_MuxKey #(1, 7, 1) mem_wen_mux(
                mem_wen, opcode, {
                    7'b0100011, 1'b1
                }
            );
 
     wire csr_wen;
-    MuxKey #(1, 7, 1) csr_wen_mux(
+    ysyx_25020032_MuxKey #(1, 7, 1) csr_wen_mux(
                csr_wen, opcode, {
                    7'b1110011, mret? 1'b0 : 1'b1
                }
