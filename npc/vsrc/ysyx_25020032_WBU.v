@@ -129,15 +129,17 @@ module ysyx_25020032_WBU(
                         arvalid <= 1'b1;
                         araddr <= raddr;
                         rready <= 1'b1;
+                        arsize <= size;
                     end
                     
                     if(valid && mem_wen && idu_valid) begin
                         awvalid <= 1'b1;
                         awaddr <= waddr;
                         wvalid <= 1'b1;
-                        wdata <= wdata;
+                        wdata <= wrdata;
                         wstrb <= wmask[3:0];  // Convert 8-bit to 4-bit
                         bready <= 1'b1;
+                        awsize <= size;
                     end
 
                     mem_valid <= 1'b0;
@@ -195,6 +197,17 @@ module ysyx_25020032_WBU(
                    3'b010, rdata_latch,
                    3'b100, {{24{1'b0}}, lb_data},
                    3'b101, {{16{1'b0}}, lh_data}
+               }
+           );
+
+    wire [2:0] size;
+    ysyx_25020032_MuxKey #(3, 3, 3) size_mux(
+               size, mem_width, {
+                   3'b000, 3'b000,
+                   3'b001, 3'b001,
+                   3'b010, 3'b010,
+                   3'b100, 3'b000,
+                   3'b101, 3'b001
                }
            );
 

@@ -51,7 +51,7 @@ clean:
 
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	verilator -MMD --trace-fst -j 0 --build --timescale "1ns/1ns" --no-timing \
+	verilator -MMD --trace-fst -j 0 --build --autoflush --timescale "1ns/1ns" --no-timing \
 	--cc vsrc/*.v $(PERIP) ../ysyxSoC/build/ysyxSoCFull.v \
 	-top ysyxSoCFull \
 	-I./include -I../ysyxSoC/perip/uart16550/rtl -I../ysyxSoC/perip/spi/rtl \

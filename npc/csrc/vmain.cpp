@@ -30,7 +30,7 @@ void signal_handler(int signum) {
 long start_time;
 long long total_cycles = 0;
 
-vector<uint32_t> mem(32 * 1024 * 1024);
+vector<uint32_t> mem(100);
 void sdb_mainloop();
 void calculator_test();
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
@@ -44,7 +44,13 @@ void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
 extern "C" void flash_read(int32_t addr, int32_t *data) { assert(0); }
-extern "C" void mrom_read(int32_t addr, int32_t *data) { *data = 0x00100073; }
+extern "C" void mrom_read(int32_t addr, int32_t *data) { 
+    addr -= 0x20000000;
+    if (addr / 4 < mem.size())
+    {   
+        *data = mem[addr / 4];
+    }
+ }
 
 long get_elapsed_microseconds()
 {
@@ -117,7 +123,7 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask)
     {
         difftest_skip_ref();
         putchar(wdata);
-        fflush(stdout);
+        fflush(stdout); 
         return;
     }
 
@@ -364,7 +370,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        difftest_step(get_pc_val());
+        //difftest_step(get_pc_val());
 
         watchpoint_inspect();
     }
@@ -382,7 +388,7 @@ int main(int argc, char **argv)
 
     init_monitor(argc, argv, mem);
 
-    reset(5);
+    reset(10);
 
     uint8_t *byteArray = reinterpret_cast<uint8_t *>(mem.data());
     size_t byteArraySize = mem.size() * sizeof(uint32_t);

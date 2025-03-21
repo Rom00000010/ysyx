@@ -3,7 +3,7 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 
-bool is_batch_mode = true;
+bool is_batch_mode = false;
 extern bool stop;
 extern svScope scope;
 void cpu_exec(unsigned int n);
