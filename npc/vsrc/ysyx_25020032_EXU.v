@@ -98,7 +98,6 @@ module ysyx_25020032_EXU(
     // Calculate memory write signal
     assign waddr = alu_res;
     assign raddr = alu_res;
-    assign wdata = data_reg2;
 
     // Generate wmask based on which part of the 4 bytes need to write
     wire [3:0] sb_mask = (4'b0001 << waddr[1:0]);
@@ -115,6 +114,21 @@ module ysyx_25020032_EXU(
                    3'b010, sw_mask
                }
            );
+
+    wire [31:0]wbdata;
+    assign wbdata = wmask == 4'b0001 ? data_reg2 :
+                    (wmask == 4'b0010 ? data_reg2 << 8 :
+                    (wmask == 4'b0100 ? data_reg2 << 16 :
+                    (wmask == 4'b1000 ? data_reg2 << 24 : 32'h0)));
+
+    ysyx_25020032_MuxKey #(3, 3, 32) wdata_mux(
+            wdata, mem_width, {
+                3'b000, wbdata,
+                3'b001, sh_mask == 4'b1100 ? data_reg2 << 16 : data_reg2,
+                3'b010, data_reg2
+            }
+        );
+
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */
