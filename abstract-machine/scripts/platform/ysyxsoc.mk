@@ -27,8 +27,8 @@ image: image-dep
 
 run: insert-arg
 	@echo "simulate" $(IMAGE).bin
-	@$(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin # $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so
+	@$(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so
 
 gdb: insert-arg
-	@gdb --args $(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin # $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so
+	@gdb --args $(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so
 .PHONY: insert-arg

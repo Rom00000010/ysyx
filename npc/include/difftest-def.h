@@ -1,4 +1,5 @@
 #define RESET_VECTOR 0x80000000
+#define MROM_BASE 0x20000000
 enum { DIFFTEST_TO_DUT, DIFFTEST_TO_REF };
 
 static inline bool difftest_check_reg(const char *name, uint32_t pc, uint32_t ref, uint32_t dut) {

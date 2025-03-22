@@ -370,7 +370,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        //difftest_step(get_pc_val());
+        difftest_step(get_pc_val());
 
         watchpoint_inspect();
     }
@@ -395,7 +395,7 @@ int main(int argc, char **argv)
 
     start_time = get_elapsed_microseconds();
 
-    // init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
+    init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
 
     auto start = std::chrono::high_resolution_clock::now();
 

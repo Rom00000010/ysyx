@@ -49,5 +49,5 @@ void init_monitor(int argc, char **argv, vector<uint32_t> &mem)
 
     initBuffer();
 
-    // init_elf(argv[2]);
+    init_elf(argv[2]);
 }
