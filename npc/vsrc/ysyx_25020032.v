@@ -29,7 +29,7 @@
             input io_master_bvalid,
             output io_master_bready,
             output [3:0] io_master_arid,
-            output [7:0] io_master_arlen,
+            output [7:0] io_master_arlen,   
             output [2:0] io_master_arsize,
             output [1:0] io_master_arburst,
             input [3:0] io_master_rid,
@@ -197,7 +197,7 @@
                 .clk(clock), .rst(reset), 
                 .ifu_valid(ifu_valid), .idu_ready(idu_ready),
                 .wbu_valid(wbu_valid), .ifu_ready(ifu_ready),
-                .branch_taken(branch_taken), .branch_target(branch_target), 
+                .branch_taken(branch_taken), .branch_target(branch_target), .access_fault(access_fault),
                 .pc(pc), .instr(instr),
                 // AXI interface
                 .arid(ifu_arid),
@@ -271,6 +271,7 @@
                 .raddr(raddr), .waddr(waddr), .wdata(wdata), .wmask(wmask)
         );
 
+        wire access_fault;
         ysyx_25020032_WBU wbu(
             .clk(clock), .rst(reset),
             .exu_valid(exu_valid), .wbu_ready(wbu_ready), .idu_valid(idu_valid), 
@@ -281,7 +282,7 @@
             .data_reg1(data_reg1), 
             .waddr(waddr), .raddr(raddr), .wrdata(wdata), .wmask(wmask),
             .csr_out(csr_out), 
-            .wdata_regd(wdata_regd), .csr_in(csr_in),
+            .wdata_regd(wdata_regd), .csr_in(csr_in), .access_fault(access_fault), 
             // AXI interface
             .arid(wbu_arid),
             .araddr(wbu_araddr),

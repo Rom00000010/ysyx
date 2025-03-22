@@ -29,6 +29,7 @@ module ysyx_25020032_WBU(
 
         output [31:0]wdata_regd,
         output [31:0]csr_in,
+        output access_fault,
 
         // AXI interface
         `AXI_MASTER_READ_ADDR_PORTS,
@@ -91,6 +92,9 @@ module ysyx_25020032_WBU(
         
     end
 
+    reg [1:0]rresp_latch;
+    reg [1:0]bresp_latch;
+
     // Output logic
     always @(posedge clk or posedge rst) begin
         if(rst) begin
@@ -101,6 +105,8 @@ module ysyx_25020032_WBU(
             wvalid <= 1'b0;
             mem_valid <= 1'b0;
             rdata_latch <= 32'b0;
+            rresp_latch <= 2'b00;
+            bresp_latch <= 2'b00;
             // Set default values for AXI signals
             arid <= `AXI_DEFAULT_ID;
             arlen <= `AXI_DEFAULT_LEN;
@@ -153,6 +159,7 @@ module ysyx_25020032_WBU(
                             rready <= 1'b0;
                             arvalid <= 1'b0;
                             rdata_latch <= rdata;
+                            rresp_latch <= rresp;
                         end
                 end
 
@@ -163,6 +170,7 @@ module ysyx_25020032_WBU(
                             bready <= 1'b0;
                             awvalid <= 1'b0;
                             wvalid <= 1'b0;
+                            bresp_latch <= bresp;
                         end
                 end
 
@@ -173,6 +181,7 @@ module ysyx_25020032_WBU(
     end
 
     reg mem_valid;
+    assign access_fault = (rresp_latch != 2'b00 || bresp_latch != 2'b00);
 
 // =======================================Memory Read======================================
 

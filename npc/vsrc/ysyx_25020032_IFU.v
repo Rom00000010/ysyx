@@ -13,6 +13,7 @@ module ysyx_25020032_IFU(
 
         input branch_taken,
         input [31:0]branch_target,
+        input access_fault,
 
         output [31:0]pc,
         output reg [31:0]instr,
@@ -21,10 +22,11 @@ module ysyx_25020032_IFU(
         `AXI_MASTER_READ_ADDR_PORTS
     );
 
+    wire [31:0]next_pc = access_fault ? 32'h0000_0000 : (branch_taken ? branch_target : pc+4);
     // PC register
     ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h2000_0000) ) pc_reg (
             .clk(clk), .rst(rst),
-            .din(branch_taken ? branch_target : pc+4), .dout(pc), .wen(wbu_valid && ifu_ready)
+            .din(next_pc), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
 
     // =================================State Machine===========================================
@@ -68,6 +70,8 @@ module ysyx_25020032_IFU(
         endcase
     end
 
+    reg [31:0]instr_latch;
+    reg [1:0]rresp_latch;
     // Output logic
     always @(posedge clk or posedge rst) begin
         if(rst) begin
@@ -75,7 +79,8 @@ module ysyx_25020032_IFU(
             rready <= 1'b0;
             ifu_valid <= 1'b0;
             ifu_ready <= 1'b0;
-            instr <= 32'h0;
+            instr_latch <= 32'h0;
+            rresp_latch <= 2'b00;
             // Set default values for AXI signals
             arid <= `AXI_DEFAULT_ID;
             arlen <= `AXI_DEFAULT_LEN;
@@ -90,8 +95,8 @@ module ysyx_25020032_IFU(
                     if(wbu_valid && ifu_ready) begin
                         arvalid <= 1'b1;
                         rready <= 1'b1;
-                        araddr <= branch_taken ? branch_target : pc+4;
-                        instr <= 32'h0;
+                        araddr <= next_pc;
+                        instr_latch <= 32'h0;
                     end
                 end
                 FETCH: begin
@@ -107,7 +112,8 @@ module ysyx_25020032_IFU(
                         ifu_valid <= 1'b1;
                         ifu_ready <= 1'b1;
                         rready <= 1'b0;
-                        instr <= rdata;
+                        instr_latch <= rdata;
+                        rresp_latch <= rresp;
                     end
                 end
 
@@ -116,6 +122,8 @@ module ysyx_25020032_IFU(
             endcase
         end
     end
+
+    assign instr = rresp_latch == 2'b00 ? instr_latch : 32'h0;
 
     // Alarm simulation environment to stop for ebreak instruction
     always @(*) begin

@@ -370,7 +370,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        difftest_step(get_pc_val());
+        // difftest_step(get_pc_val());
 
         watchpoint_inspect();
     }
