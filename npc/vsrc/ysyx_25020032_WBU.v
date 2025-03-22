@@ -201,7 +201,7 @@ module ysyx_25020032_WBU(
            );
 
     wire [2:0] size;
-    ysyx_25020032_MuxKey #(3, 3, 3) size_mux(
+    ysyx_25020032_MuxKey #(5, 3, 3) size_mux(
                size, mem_width, {
                    3'b000, 3'b000,
                    3'b001, 3'b001,
