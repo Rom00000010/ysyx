@@ -6,6 +6,7 @@ static inline void outb(uintptr_t addr, uint8_t  data) { *(volatile uint8_t  *)a
 
 extern char _heap_start;
 int main(const char *args);
+void bootload();
 
 extern char _pmem_start;
 #define PMEM_SIZE (8 * 1024)
@@ -28,6 +29,7 @@ void halt(int code) {
 }
 
 void _trm_init() {
+  bootload(); 
   int ret = main(mainargs);
   halt(ret);
 }

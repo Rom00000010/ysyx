@@ -30,7 +30,7 @@ void signal_handler(int signum) {
 long start_time;
 long long total_cycles = 0;
 
-vector<uint32_t> mem(100);
+vector<uint32_t> mem(1024);
 void sdb_mainloop();
 void calculator_test();
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
