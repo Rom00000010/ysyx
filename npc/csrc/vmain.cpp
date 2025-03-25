@@ -31,6 +31,8 @@ long start_time;
 long long total_cycles = 0;
 
 vector<uint32_t> mem(1024);
+vector<uint32_t> flash_mem(1024);
+
 void sdb_mainloop();
 void calculator_test();
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
@@ -43,7 +45,7 @@ const char *func_name(uint32_t addr);
 void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
-extern "C" void flash_read(int32_t addr, int32_t *data) { assert(0); }
+extern "C" void flash_read(int32_t addr, int32_t *data) { printf("flash_read: %d\n", addr); *data = flash_mem[addr / 4]; }
 extern "C" void mrom_read(int32_t addr, int32_t *data) { 
     addr -= 0x20000000;
     if (addr / 4 < mem.size())

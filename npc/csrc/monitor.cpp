@@ -6,6 +6,8 @@
 #include <string>
 using namespace std;
 
+extern vector<uint32_t> flash_mem;
+
 void init_sdb();
 void init_elf(const char *elf_file);
 
@@ -41,10 +43,19 @@ void img_init(int argc, char **argv, vector<uint32_t> &mem)
     memcpy(mem.data(), buffer.data(), buffer.size());
 }
 
+void init_flash()
+{
+    flash_mem[0] = 0x04030201;
+    flash_mem[1] = 0x08070605;
+    flash_mem[2] = 0x0c0b0a09;
+    flash_mem[3] = 0x100f0e0d;
+}
+
 void init_monitor(int argc, char **argv, vector<uint32_t> &mem)
 {
     img_init(argc, argv, mem);
 
+    init_flash();
     init_sdb();
 
     initBuffer();
