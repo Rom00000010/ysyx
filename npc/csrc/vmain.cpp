@@ -22,7 +22,8 @@ bool finish = false;
 bool stop = false;
 
 // Signal handler for CTRL+C
-void signal_handler(int signum) {
+void signal_handler(int signum)
+{
     cout << "Ctrl-c Accepted" << endl;
     stop = true;
 }
@@ -31,7 +32,7 @@ long start_time;
 long long total_cycles = 0;
 
 vector<uint32_t> mem(1024);
-vector<uint32_t> flash_mem(1024);
+vector<uint8_t> flash_mem(1024);
 
 void sdb_mainloop();
 void calculator_test();
@@ -45,14 +46,24 @@ const char *func_name(uint32_t addr);
 void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
-extern "C" void flash_read(int32_t addr, int32_t *data) { printf("flash_read: %d\n", addr); *data = flash_mem[addr / 4]; }
-extern "C" void mrom_read(int32_t addr, int32_t *data) { 
+extern "C" void flash_read(int32_t addr, int32_t *data)
+{
+    printf("flash_read: %d\n", addr);
+    int32_t d = 0;
+    for(int i=0; i<4; i++)
+    {
+        d |= ((uint32_t)flash_mem[addr+i]) << (8*i);
+    }
+    *data = d;
+}
+extern "C" void mrom_read(int32_t addr, int32_t *data)
+{
     addr -= 0x20000000;
     if (addr / 4 < mem.size())
-    {   
+    {
         *data = mem[addr / 4];
     }
- }
+}
 
 long get_elapsed_microseconds()
 {
@@ -125,7 +136,7 @@ extern "C" void pmem_write(int waddr, int wdata, char wmask)
     {
         difftest_skip_ref();
         putchar(wdata);
-        fflush(stdout); 
+        fflush(stdout);
         return;
     }
 
@@ -172,7 +183,7 @@ void step_and_dump_wave(unsigned int n)
         {
             SET_WBU
             if (!wbu_skip())
-                {   
+            {
                 SET_TOP
                 ftrace(get_pc_val(), get_instr());
             }
@@ -340,9 +351,10 @@ void ftrace(uint32_t pc, uint32_t instr)
 }
 
 void cpu_exec(unsigned int n)
-{   
+{
 #ifdef CONFIG_PERF_MODE
-    while(!stop) step_and_dump_wave(2);
+    while (!stop)
+        step_and_dump_wave(2);
 #else
     unsigned int cnt = n;
     char log_buf[100];
@@ -360,7 +372,7 @@ void cpu_exec(unsigned int n)
             step_and_dump_wave(2);
             continue;
         }
-        
+
         if (n <= 10)
         {
             cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
@@ -380,7 +392,7 @@ void cpu_exec(unsigned int n)
 }
 
 int main(int argc, char **argv)
-{   
+{
     // Capture Ctrl-c, stop simulation in time
     signal(SIGINT, signal_handler);
 
@@ -405,7 +417,7 @@ int main(int argc, char **argv)
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
-    
+
     double sim_rate = total_cycles / elapsed.count();
     std::cout << "仿真速率: " << sim_rate / 1e6 << " MHz" << std::endl;
 

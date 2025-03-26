@@ -11,7 +11,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-//#define CONFIG_WATCHPOINT
+#define CONFIG_WATCHPOINT
 //#define CONFIG_FTRACE
 //#define CONFIG_MTRACE
 //#define CONFIG_PERF_MODE
