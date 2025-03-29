@@ -31,12 +31,11 @@ void signal_handler(int signum)
 long start_time;
 long long total_cycles = 0;
 
-vector<uint32_t> mem(1024);
-vector<uint8_t> flash_mem(1024);
+vector<uint8_t> mem(16 * 1024 * 1024);
 
 void sdb_mainloop();
 void calculator_test();
-void init_monitor(int argc, char **argv, vector<uint32_t> &mem);
+void init_monitor(int argc, char **argv, vector<uint8_t> &mem);
 void init_difftest(char *ref_so_file, long img_size, void *mem, int port);
 uint32_t scan_watchpoints(bool *success);
 uint32_t watchpoint_val();
@@ -47,12 +46,13 @@ void ftrace(uint32_t pc, uint32_t instr);
 void difftest_step(uint32_t pc);
 void difftest_skip_ref();
 extern "C" void flash_read(int32_t addr, int32_t *data)
-{
-    printf("flash_read: %d\n", addr);
+{   
+    // Align address to 4-byte boundary
+    int32_t aligned_addr = addr & ~0x3;
     int32_t d = 0;
     for(int i=0; i<4; i++)
     {
-        d |= ((uint32_t)flash_mem[addr+i]) << (8*i);
+        d |= ((uint32_t)mem[aligned_addr+i]) << (8*i);
     }
     *data = d;
 }
@@ -98,76 +98,76 @@ void set_finish()
 
 extern "C" int pmem_read(int raddr)
 {
-#ifdef CONFIG_MTRACE
-    SET_TOP
-    if (raddr != get_pc_val() && raddr >= 0x80000000 && BITS(get_instr(), 6, 0) == 0b0000011)
-    {
-        printf("access 0x%08x at pc = 0x%08x\n", raddr, get_pc_val());
-    }
-#endif
-    // Timer access
-    if (raddr == 0xa0000048)
-    {
-        difftest_skip_ref();
-        long end_time = get_elapsed_microseconds();
-        return end_time - start_time;
-    }
+// #ifdef CONFIG_MTRACE
+//     SET_TOP
+//     if (raddr != get_pc_val() && raddr >= 0x80000000 && BITS(get_instr(), 6, 0) == 0b0000011)
+//     {
+//         printf("access 0x%08x at pc = 0x%08x\n", raddr, get_pc_val());
+//     }
+// #endif
+//     // Timer access
+//     if (raddr == 0xa0000048)
+//     {
+//         difftest_skip_ref();
+//         long end_time = get_elapsed_microseconds();
+//         return end_time - start_time;
+//     }
 
-    // 总是读取地址为`raddr & ~0x3u`的4字节返回
-    raddr &= ~0x3u;
-    raddr -= 0x80000000;
-    if (raddr / 4 < mem.size())
-    {
-        return mem[raddr / 4];
-    }
-    return 0;
+//     // 总是读取地址为`raddr & ~0x3u`的4字节返回
+//     raddr &= ~0x3u;
+//     raddr -= 0x80000000;
+//     if (raddr / 4 < mem.size())
+//     {
+//         return mem[raddr / 4];
+//     }
+//     return 0;
 }
 extern "C" void pmem_write(int waddr, int wdata, char wmask)
 {
-    SET_TOP
-#ifdef CONFIG_MTRACE
-    if (waddr != get_pc_val() && waddr >= 0x80000000)
-    {
-        printf("write data 0x%08x with mask 0x%02x to addr 0x%08x at pc = 0x%08x\n", wdata, wmask, waddr, get_pc_val());
-    }
-#endif
-    // Serial port access
-    if (waddr == 0xa00003f8)
-    {
-        difftest_skip_ref();
-        putchar(wdata);
-        fflush(stdout);
-        return;
-    }
+//     SET_TOP
+// #ifdef CONFIG_MTRACE
+//     if (waddr != get_pc_val() && waddr >= 0x80000000)
+//     {
+//         printf("write data 0x%08x with mask 0x%02x to addr 0x%08x at pc = 0x%08x\n", wdata, wmask, waddr, get_pc_val());
+//     }
+// #endif
+//     // Serial port access
+//     if (waddr == 0xa00003f8)
+//     {
+//         difftest_skip_ref();
+//         putchar(wdata);
+//         fflush(stdout);
+//         return;
+//     }
 
-    waddr &= ~0x3u;
-    waddr -= 0x80000000;
+//     waddr &= ~0x3u;
+//     waddr -= 0x80000000;
 
-    if (waddr / 4 < mem.size())
-    {
-        uint32_t *ptr = &mem[waddr / 4];
+//     if (waddr / 4 < mem.size())
+//     {
+//         uint32_t *ptr = &mem[waddr / 4];
 
-        uint32_t byte_mask = 0;
-        for (int i = 0; i < 4; i++)
-        {
-            if (wmask & (1 << i))
-            {
-                byte_mask |= (0xFFu << (8 * i));
-            }
-        }
+//         uint32_t byte_mask = 0;
+//         for (int i = 0; i < 4; i++)
+//         {
+//             if (wmask & (1 << i))
+//             {
+//                 byte_mask |= (0xFFu << (8 * i));
+//             }
+//         }
 
-        // calculate bytes wdata need to shift according to mask
-        int shift = 0;
-        unsigned char mask_temp = wmask;
-        while ((mask_temp & 1) == 0 && shift < 4)
-        {
-            shift++;
-            mask_temp >>= 1;
-        }
-        uint32_t aligned_wdata = wdata << (shift * 8);
+//         // calculate bytes wdata need to shift according to mask
+//         int shift = 0;
+//         unsigned char mask_temp = wmask;
+//         while ((mask_temp & 1) == 0 && shift < 4)
+//         {
+//             shift++;
+//             mask_temp >>= 1;
+//         }
+//         uint32_t aligned_wdata = wdata << (shift * 8);
 
-        *ptr = (*ptr & ~byte_mask) | (aligned_wdata & byte_mask);
-    }
+//         *ptr = (*ptr & ~byte_mask) | (aligned_wdata & byte_mask);
+//     }
 }
 
 void step_and_dump_wave(unsigned int n)
@@ -351,7 +351,7 @@ void ftrace(uint32_t pc, uint32_t instr)
 }
 
 void cpu_exec(unsigned int n)
-{
+{   
 #ifdef CONFIG_PERF_MODE
     while (!stop)
         step_and_dump_wave(2);
@@ -409,7 +409,7 @@ int main(int argc, char **argv)
 
     start_time = get_elapsed_microseconds();
 
-    init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
+    //init_difftest(argv[3], byteArraySize, (void *)byteArray, 1234);
 
     auto start = std::chrono::high_resolution_clock::now();
 
