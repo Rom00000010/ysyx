@@ -369,7 +369,8 @@ uint32_t eval(int p, int q, bool *success)
     case TK_DEREF: // read 4 bytes from memory
     {
       uint32_t vaddr = value2;
-      uint32_t value = pmem_read(vaddr);
+      int32_t value;
+      flash_read(vaddr-0x30000000, &value);
       return value;
     }
     default:

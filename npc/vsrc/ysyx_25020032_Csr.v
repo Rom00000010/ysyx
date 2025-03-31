@@ -16,6 +16,10 @@ module ysyx_25020032_Csr (
 );
   reg [31:0]mstatus;
   reg [31:0]mcause;
+  wire [31:0]mvendorid = 32'h79737978;
+  wire [31:0]marchid = 32'h017dc680;
+
+  wire [31:0]mask_addr = addr & 32'h00000fff;
 
   always @(posedge clk or posedge rst) begin
     if (rst) begin 
@@ -29,19 +33,21 @@ module ysyx_25020032_Csr (
       mepc   <= exception_pc;
     end
     else if (csr_wen) begin  
-      if(addr == 32'h305) mtvec <= csr_in;
-      else if(addr == 32'h300) mstatus <= csr_in;
-      else if(addr == 32'h341) mepc    <= csr_in;
-      else if(addr == 32'h342) mcause  <= csr_in;
+      if(mask_addr == 32'h00000305) mtvec <= csr_in;
+      else if(mask_addr == 32'h00000300) mstatus <= csr_in;
+      else if(mask_addr == 32'h00000341) mepc    <= csr_in;
+      else if(mask_addr == 32'h00000342) mcause  <= csr_in;
     end
   end
 
-  ysyx_25020032_MuxKey #(4, 32, 32) out_mux(
-    csr_out, addr, {
-      32'h305, mtvec,
-      32'h300, mstatus,
-      32'h341, mepc,
-      32'h342, mcause
+  ysyx_25020032_MuxKey #(6, 32, 32) out_mux(
+    csr_out, mask_addr, {
+      32'h00000305, mtvec,
+      32'h00000300, mstatus,
+      32'h00000341, mepc,
+      32'h00000342, mcause,
+      32'h00000f11, mvendorid,
+      32'h00000f12, marchid
     }
   );
 endmodule

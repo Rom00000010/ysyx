@@ -11,7 +11,6 @@ AM_SRCS := riscv/ysyxsoc/start.S \
 
 CFLAGS    += -fdata-sections -ffunction-sections
 LDSCRIPTS += $(AM_HOME)/scripts/ysyxsoc-linker.ld
-LDFLAGS   += --defsym=_pmem_start=0x20000000 --defsym=_entry_offset=0x0
 LDFLAGS   += --gc-sections -e _start #--print-map
 
 MAINARGS_MAX_LEN = 64
@@ -28,7 +27,7 @@ image: image-dep
 
 run: insert-arg
 	@echo "simulate" $(IMAGE).bin
-	@$(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so /home/rom/ysyx-workbench/am-kernels/kernels/char-test/build/char-test-riscv32e-ysyxsoc.bin
+	@$(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so
 
 gdb: insert-arg
 	@gdb --args $(NPC_HOME)/obj_dir/VysyxSoCFull $(IMAGE).bin $(IMAGE).elf $(NEMU_HOME)/build/riscv32-nemu-interpreter-so

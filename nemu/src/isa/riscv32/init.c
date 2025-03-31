@@ -34,6 +34,9 @@ static void restart() {
   cpu.gpr[0] = 0;
 
   cpu.sr[0x300] = 0x1800;
+
+  cpu.sr[0xf11] = 0x79737978;
+  cpu.sr[0xf12] = 0x017dc680;
 }
 
 void init_isa() {

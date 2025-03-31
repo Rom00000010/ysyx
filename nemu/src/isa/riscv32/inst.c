@@ -175,13 +175,15 @@ static int decode_exec(Decode *s) {
 
 
   INSTPAT("??????? ????? ????? 001 ????? 1110011", csrrw, I, {
-    word_t t = SR(imm);
-    SR(imm) = src1;
+    uint32_t sysreg_id = imm & 0x0fff;
+    word_t t = SR(sysreg_id);
+    SR(sysreg_id) = src1;
     R(rd) = t;
   });
   INSTPAT("??????? ????? ????? 010 ????? 1110011", csrrs, I, {
-    word_t t = SR(imm);
-    SR(imm) = t | src1;
+    uint32_t sysreg_id = imm & 0x0fff;
+    word_t t = SR(sysreg_id);
+    SR(sysreg_id) = t | src1;
     R(rd) = t;
   });
   INSTPAT("0000000 00000 00000 000 00000 1110011", ecall, I, {

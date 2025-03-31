@@ -3,14 +3,18 @@
 #include <readline/history.h>
 #include <readline/readline.h>
 
+#ifdef CONFIG_PERF_MODE
+bool is_batch_mode = true;
+#else
 bool is_batch_mode = false;
+#endif
 extern bool stop;
 extern svScope scope;
 void cpu_exec(unsigned int n);
 void init_regex();
 void init_wp_pool();
 uint32_t expr(char *e, bool *success);
-int pmem_read(int addr);
+void flash_read(int32_t addr, int32_t *data);
 void new_wp(char *exp, uint32_t val);
 void watchpoint_display();
 int delete_watchpoint(int no);
@@ -122,7 +126,8 @@ static int cmd_x(char *args)
       printf("\033[34m0x%x\033[0m: ", vaddr + 4 * i);
       for (j = 0; j < 4; j++)
       {
-        uint32_t value = pmem_read(vaddr + 4 * i + 4 * j);
+        int32_t value;
+        flash_read(vaddr + 4 * i + 4 * j - 0x30000000, &value);
         printf("0x%08x    ", value);
       }
       printf("\n");

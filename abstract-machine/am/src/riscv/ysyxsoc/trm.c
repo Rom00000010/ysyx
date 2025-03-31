@@ -1,5 +1,6 @@
 #include <am.h>
 #include <klib-macros.h>
+#include <klib.h> 
 
 #define UART_BASE 0x10000000
 #define UART_REG(offset) (*(volatile uint8_t *)(UART_BASE + (offset)))
@@ -62,6 +63,17 @@ void halt(int code) {
 void _trm_init() {
   bootload(); 
   uart_init_1152008n1();
+  
+  uint32_t mvendorid, marchid;
+  asm volatile("csrr %0, 0xf11" : "=r"(mvendorid));
+  asm volatile("csrr %0, 0xf12" : "=r"(marchid));
+
+  for(int i = 0; i < 4; i++) {
+    putch(mvendorid>>(24-i*8));
+  }
+  putch('_');
+  printf("%d\n", marchid);
+
   int ret = main(mainargs);
   halt(ret);
 }

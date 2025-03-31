@@ -155,11 +155,6 @@ module ysyx_25020032_Xbar (
             s_rid = soc_rid;
             s_rlast = soc_rlast;
             soc_rready = s_rready;
-        end else if (s_arvalid) begin
-            // Invalid address
-            s_arready = 1'b1;
-            s_rvalid = 1'b1;
-            s_rresp = 2'b11;  // DECERR
         end
     end
 
@@ -228,12 +223,6 @@ module ysyx_25020032_Xbar (
             s_bresp = soc_bresp;
             s_bid = soc_bid;
             soc_bready = s_bready;
-        end else if (s_awvalid || s_wvalid) begin
-            // Invalid address
-            s_awready = 1'b1;
-            s_wready = 1'b1;
-            s_bvalid = 1'b1;
-            s_bresp = 2'b11;  // DECERR
         end
     end
 
