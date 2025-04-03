@@ -24,6 +24,7 @@ long start_time;
 long long total_cycles = 0;
 
 vector<uint8_t> mem(16 * 1024 * 1024);
+vector<uint8_t> psram(4 * 1024 * 1024);
 
 void sdb_mainloop();
 void init_monitor(int argc, char **argv, vector<uint8_t> &mem);
@@ -50,6 +51,22 @@ extern "C" void mrom_read(int32_t addr, int32_t *data)
     if (addr / 4 < mem.size())
     {
         *data = mem[addr / 4];
+    }
+}   
+extern "C" void psram_read(int32_t addr, int32_t *data)
+{   
+    int32_t d = 0;
+    for(int i=0; i<4; i++)
+    {
+        d |= ((uint32_t)psram[addr+i]) << (8*i);
+    }
+    *data = d;
+}
+extern "C" void psram_write(int32_t addr, int32_t data, int32_t wcount)
+{   
+    for(int i=0; i<wcount; i++)
+    {
+        psram[addr + wcount - i - 1] = (data >> (8*i)) & 0x000000ff;
     }
 }
 

@@ -116,15 +116,15 @@ module ysyx_25020032_EXU(
            );
 
     wire [31:0]wbdata;
-    assign wbdata = wmask == 4'b0001 ? data_reg2 :
-                    (wmask == 4'b0010 ? data_reg2 << 8 :
-                    (wmask == 4'b0100 ? data_reg2 << 16 :
-                    (wmask == 4'b1000 ? data_reg2 << 24 : 32'h0)));
+    assign wbdata = wmask == 4'b0001 ? {24'd0,data_reg2[7:0]} :
+                    (wmask == 4'b0010 ? {16'd0, data_reg2[7:0], 8'd0} :
+                    (wmask == 4'b0100 ? {8'd0, data_reg2[7:0], 16'd0} :
+                    (wmask == 4'b1000 ? {data_reg2[7:0], 24'd0} : 32'h0)));
 
     ysyx_25020032_MuxKey #(3, 3, 32) wdata_mux(
             wdata, mem_width, {
                 3'b000, wbdata,
-                3'b001, sh_mask == 4'b1100 ? data_reg2 << 16 : data_reg2,
+                3'b001, sh_mask == 4'b1100 ? {data_reg2[15:0], 16'd0} : {16'd0, data_reg2[15:0]},
                 3'b010, data_reg2
             }
         );
