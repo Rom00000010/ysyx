@@ -1,4 +1,5 @@
 #include <common.h>
+#include <macro.h>
 #include <iringbuf.h>
 #include <capstone/capstone.h>
 #include <iostream>
@@ -9,6 +10,8 @@ using namespace std;
 
 extern bool stop;
 extern VerilatedFstC *tfp;
+
+extern int depth;
 
 void init_sdb();
 void init_elf(const char *elf_file);

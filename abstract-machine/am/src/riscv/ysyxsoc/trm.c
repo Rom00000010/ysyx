@@ -25,7 +25,7 @@ int main(const char *args);
 void bootload();
 
 extern char _pmem_start;
-#define PMEM_SIZE (8 * 1024)
+#define PMEM_SIZE (4 * 1024 * 1024)
 #define PMEM_END  ((uintptr_t)&_pmem_start + PMEM_SIZE)
 
 Area heap = RANGE(&_heap_start, PMEM_END);
@@ -61,7 +61,6 @@ void halt(int code) {
 }
 
 void _trm_init() {
-  bootload(); 
   uart_init_1152008n1();
   
   uint32_t mvendorid, marchid;
