@@ -100,10 +100,10 @@ module ysyx_25020032_Xbar (
     );
 
     // Address decoding - only based on address values
-    wire is_clint_addr = (s_araddr >= 32'ha0000048 && s_araddr <= 32'ha000004c) || (s_awaddr >= 32'ha0000048 && s_awaddr <= 32'ha000004c);
+    wire is_clint_addr = (s_araddr >= 32'h02000000 && s_araddr <= 32'h0200ffff) || (s_awaddr >= 32'h02000000 && s_awaddr <= 32'h0200ffff);
     wire is_soc_addr = !is_clint_addr;  // All non-CLINT addresses go to SoC
 
-    // Read channel routing
+    // Read channel routings
     always @(*) begin
         clint_arvalid = 0;
         soc_arvalid = 0;

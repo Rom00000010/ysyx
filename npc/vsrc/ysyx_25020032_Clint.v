@@ -78,8 +78,8 @@ module ysyx_25020032_Clint (
                     if (arvalid && arready) begin
                         // Decode address and prepare response
                         case (araddr)
-                            32'ha0000048: rdata <= mtime[31:0];   // Lower 32 bits
-                            32'ha000004c: rdata <= mtime[63:32];  // Upper 32 bits
+                            32'h02000000: rdata <= mtime[31:0];   // Lower 32 bits
+                            32'h02000004: rdata <= mtime[63:32];  // Upper 32 bits
                             default: rdata <= 32'b0;              // Invalid address
                         endcase
                         rid <= arid;

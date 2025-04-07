@@ -25,6 +25,8 @@
 #define SRAM_SIZE 0x2000
 #define FLASH_BASE 0x30000000
 #define FLASH_SIZE 0x1000000
+#define SDRAM_BASE 0xa0000000
+#define SDRAM_SIZE 32 * 1024 * 1024
 
 /* convert the guest physical address in the guest program to host virtual address in NEMU */
 uint8_t* guest_to_host(paddr_t paddr);
@@ -41,6 +43,10 @@ static inline bool in_sram(paddr_t addr) {
 
 static inline bool in_flash(paddr_t addr) {
   return addr - FLASH_BASE < FLASH_SIZE;
+}
+
+static inline bool in_sdram(paddr_t addr) {
+  return addr - SDRAM_BASE < SDRAM_SIZE;
 }
 
 word_t paddr_read(paddr_t addr, int len);

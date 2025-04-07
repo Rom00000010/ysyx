@@ -11,7 +11,7 @@ AM_SRCS := riscv/ysyxsoc/start.S \
 
 CFLAGS    += -fdata-sections -ffunction-sections
 LDSCRIPTS += $(AM_HOME)/scripts/ysyxsoc-linker.ld
-LDFLAGS   += --defsym=_pmem_start=0x80000000 --defsym=_entry_offset=0x0
+LDFLAGS   += --defsym=_pmem_start=0xa0000000 --defsym=_entry_offset=0x0
 LDFLAGS   += --gc-sections -e _start #--print-map
 
 MAINARGS_MAX_LEN = 64
@@ -25,7 +25,7 @@ image: image-dep
 	@$(OBJDUMP) -d $(IMAGE).elf > $(IMAGE).txt
 	@echo + OBJCOPY "->" $(IMAGE_REL).bin
 	@$(OBJCOPY) -S -j .entry -O binary $(IMAGE).elf entry.bin
-	@$(OBJCOPY) -S -j .text -j .rodata -j .data.extra -j .data -j .bss.extra -j .bss -O binary $(IMAGE).elf psram.bin
+	@$(OBJCOPY) -S -j .text -j .rodata -j .data -j .bss -O binary $(IMAGE).elf psram.bin
 	@$(OBJCOPY) -S -j .ssbl -O binary $(IMAGE).elf ssbl.bin
 	@cat entry.bin ssbl.bin psram.bin > $(IMAGE).bin
 

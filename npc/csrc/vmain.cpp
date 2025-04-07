@@ -121,7 +121,6 @@ void step_and_dump_wave(unsigned int n)
 
         sim_time++;
         tfp->dump(sim_time);
-
         total_cycles += 1;
 #endif
     }

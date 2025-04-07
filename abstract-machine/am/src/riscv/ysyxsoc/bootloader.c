@@ -1,5 +1,8 @@
 #include <am.h>
-extern uint32_t _sidata, _data, _edata, _bstart, _bend, _sirodata, _rodata, _erodata, _sitext, _text, _etext, _sissbl, _ssbl, _essbl, _siexdata, _exdata, _eexdata;
+
+extern uint32_t _sidata, _data, _edata, _bstart, _bend, _sirodata, _rodata, _erodata, _sitext, _text, _etext, _sissbl, _ssbl, _essbl;
+
+//extern uint32_t _siexdata, _exdata, _eexdata;
 
 void bootload()__attribute__((section(".bootloader"))); 
 void sbootload()__attribute__((section(".sbootloader")));
@@ -24,10 +27,10 @@ void sbootload(){
   { *dst++ = *src++; }
 
   /* Copy the exception data.  */
-  src = &_siexdata;
-  dst = &_exdata;
-  while (dst < &_eexdata)
-  { *dst++ = *src++; }
+  //src = &_siexdata;
+  //dst = &_exdata;
+  //while (dst < &_eexdata)
+  //{ *dst++ = *src++; }
 
   /* Zero bss.  */
   for (dst = &_bstart; dst < &_bend; dst++)

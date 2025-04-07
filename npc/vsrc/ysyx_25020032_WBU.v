@@ -97,7 +97,7 @@ module ysyx_25020032_WBU(
 
     // For Difftest
     wire sram_access = raddr >= 32'h0f000000 && raddr < 32'h0f000000 + 32'h00002000;
-
+    wire sdram_access = raddr >= 32'ha0000000 && raddr < 32'hbfffffff;
     // Output logic
     always @(posedge clk or posedge rst) begin
         if(rst) begin
@@ -163,7 +163,7 @@ module ysyx_25020032_WBU(
                             arvalid <= 1'b0;
                             rdata_latch <= rdata;
                             rresp_latch <= rresp;
-                            if(!sram_access)
+                            if(!sram_access && !sdram_access)
                                 difftest_skip_ref();
                         end
                 end
@@ -176,7 +176,7 @@ module ysyx_25020032_WBU(
                             awvalid <= 1'b0;
                             wvalid <= 1'b0;
                             bresp_latch <= bresp;
-                            if(!sram_access)
+                            if(!sram_access && !sdram_access)
                                 difftest_skip_ref();
                         end
                 end

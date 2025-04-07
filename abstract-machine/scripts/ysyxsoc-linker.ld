@@ -4,7 +4,7 @@ PHDRS { text PT_LOAD; data PT_LOAD; boot PT_LOAD; sboot PT_LOAD; }
 MEMORY {
     flash : ORIGIN = 0x30000000, LENGTH = 16M
     sram : ORIGIN = 0x0f000000, LENGTH = 8K
-    psram : ORIGIN = 0x80000000, LENGTH = 4M
+    sdram : ORIGIN = 0xa0000000, LENGTH = 32M
 }
 
 SECTIONS {
@@ -25,7 +25,7 @@ SECTIONS {
     _text = .;
     *(.text*)
     _etext = .;
-  } > psram AT> flash : text
+  } > sdram AT> flash : text
 
   _sirodata = LOADADDR(.rodata);
   .rodata : {
@@ -33,7 +33,7 @@ SECTIONS {
     *(.rodata*)
     *(.srodata*)
     _erodata = .;
-  } > psram AT> flash : data
+  } > sdram AT> flash : data
 
   _sidata = LOADADDR(.data);
   .data : {
@@ -41,7 +41,7 @@ SECTIONS {
     *(.data*)
     *(.sdata*)
     _edata = .;
-  } > psram AT> flash
+  } > sdram AT> flash
 
   .bss (NOLOAD): {
 	_bstart = .;
@@ -49,7 +49,7 @@ SECTIONS {
     *(.sbss*)
     *(.scommon)
     _bend = .;
-  } > psram
+  } > sdram
 
   . = ALIGN(4);
   _heap_start = .;
