@@ -1,12 +1,18 @@
 `include "common.vh"
 /* verilator lint_off UNUSEDSIGNAL */
+
+`ifndef SYNTHESIS
 import "DPI-C" function void set_finish ();
 import "DPI-C" function void difftest_skip_ref();
+`endif
 
 module ysyx_25020032 (
         input clock,
         input reset,
         input io_interrupt,
+
+        output [31:0]pc,
+        output [31:0]instr,
 
         // Master AXI interface
         output [31:0] io_master_araddr,
@@ -79,9 +85,6 @@ module ysyx_25020032 (
     wire exu_valid;
     wire wbu_ready;
     wire wbu_valid;
-
-    wire [31:0]pc;
-    wire [31:0]instr;
 
     // IFU AXI signals
     wire [31:0] ifu_araddr;
@@ -192,6 +195,7 @@ module ysyx_25020032 (
     wire xbar_wlast;
 
     integer total_instr_cnt;
+`ifndef SYNTHESIS
     // Alarm simulation environment to stop for ebreak instruction
     always @(*) begin
         if(instr == 32'h00100073) begin
@@ -215,7 +219,7 @@ module ysyx_25020032 (
             set_finish();
         end
     end
-    
+`endif
     ysyx_25020032_IFU ifu(
             .clk(clock), .rst(reset), 
             .ifu_valid(ifu_valid), .idu_ready(idu_ready),
@@ -567,6 +571,7 @@ module ysyx_25020032 (
     assign io_slave_bvalid = 1'b0;
     assign io_slave_bid = 4'b0;
 
+`ifndef SYNTHESIS
     function automatic int get_dnpc();
         get_dnpc = branch_target;
     endfunction
@@ -582,6 +587,6 @@ module ysyx_25020032 (
     export "DPI-C" function get_dnpc;
     export "DPI-C" function get_instr;
     export "DPI-C" function get_pc_val;
-
+`endif
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

@@ -184,8 +184,10 @@ module ysyx_25020032_WBU(
                         arvalid <= 1'b0;
                         rdata_latch <= rdata;
                         rresp_latch <= rresp;
+`ifndef SYNTHESIS
                         if(!sram_access && !sdram_access)
                             difftest_skip_ref();
+`endif
                     end
                 end
 
@@ -196,8 +198,10 @@ module ysyx_25020032_WBU(
                         awvalid <= 1'b0;
                         wvalid <= 1'b0;
                         bresp_latch <= bresp;
+`ifndef SYNTHESIS
                         if(!sram_access && !sdram_access)
                             difftest_skip_ref();
+`endif
                     end
                 end
 
@@ -262,11 +266,12 @@ module ysyx_25020032_WBU(
 
     // ==================================================================================
 
+`ifndef SYNTHESIS
     function automatic int wbu_skip();
         wbu_skip = {31'b0, !(state == IDLE && wbu_valid == 1'b1)};
     endfunction
 
     export "DPI-C" function wbu_skip;
-
-           endmodule
+`endif
+endmodule
            /* verilator lint_on UNUSEDSIGNAL */

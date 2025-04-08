@@ -13,7 +13,6 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            rf <= '{default: 0};
         end
         else if (write_enable) begin
             rf[waddr] <= wdata;
@@ -27,6 +26,7 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
     assign rdata1 = raddr1 == 0 ? zero_reg : rf[raddr1];
     assign rdata2 = raddr2 == 0 ? zero_reg : rf[raddr2];
 
+`ifndef SYNTHESIS
     // for sdb info register
     function automatic [79:0] get_abi_name;
         input [3:0] reg_index;
@@ -122,5 +122,7 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
     endfunction
 
     export "DPI-C" function get_reg_val_by_abi;
+
+`endif
 
 endmodule
