@@ -190,6 +190,31 @@ module ysyx_25020032 (
     wire xbar_rlast;
     wire [3:0] xbar_bid;
     wire xbar_wlast;
+
+    integer total_instr_cnt;
+    // Alarm simulation environment to stop for ebreak instruction
+    always @(*) begin
+        if(instr == 32'h00100073) begin
+            `ifdef FETCH_EVENT
+                $display("Fetch event count: %d", ifu.fetch_event_cnt);
+            `endif
+            `ifdef DECODE_EVENT
+                $display("Compute instruction count: %d", idu.compute_instr_cnt);
+                $display("Memory instruction count: %d", idu.memory_instr_cnt);
+                $display("Load instruction count: %d", idu.load_instr_cnt);
+                $display("Store instruction count: %d", idu.store_instr_cnt);
+                $display("CSR instruction count: %d", idu.csr_instr_cnt);
+                $display("Branch instruction count: %d", idu.branch_instr_cnt);
+            `endif  
+            `ifdef MEMORY_EVENT
+                $display("Memory Extra cycle count: %d", wbu.extra_cnt);
+                $display("Wait cycle count: %d", wbu.extra_cnt - wbu.finish_cnt);
+                $display("Access success cycle count: %d", wbu.finish_cnt);
+                $display("Average memory access time: %d", (wbu.extra_cnt / wbu.finish_cnt));
+            `endif
+            set_finish();
+        end
+    end
     
     ysyx_25020032_IFU ifu(
             .clk(clock), .rst(reset), 

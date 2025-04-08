@@ -1,5 +1,6 @@
 /* verilator lint_off UNUSEDSIGNAL */
 `include "axi_interface.vh"
+`include "common.vh"
 
 module ysyx_25020032_WBU(
         input clk,
@@ -34,7 +35,28 @@ module ysyx_25020032_WBU(
         // AXI interface
         `AXI_MASTER_READ_ADDR_PORTS,
         `AXI_MASTER_WRITE_ADDR_PORTS
-   );
+    );
+
+`ifdef MEMORY_EVENT
+    // extra cycle caused by memory access
+    reg [31:0] extra_cnt;
+
+    reg [31:0] finish_cnt;
+
+    initial begin
+        extra_cnt = 0;
+        finish_cnt = 0;
+    end
+
+    always @(posedge clk) begin
+        if(state == IDLE && mem_valid == 1'b1) begin
+            extra_cnt <= extra_cnt + 1;
+            finish_cnt <= finish_cnt + 1;
+        end
+        else if(state != IDLE)
+            extra_cnt <= extra_cnt + 1;
+    end
+`endif
 
     wire not_ld = (idu_valid && exu_valid && wbu_ready) && !valid;
     always @(*) begin
@@ -48,7 +70,7 @@ module ysyx_25020032_WBU(
         end
     end
 
-// =======================================State Machine======================================
+    // =======================================State Machine======================================
 
     localparam IDLE = 0,
                READ_WAIT = 1,
@@ -89,7 +111,7 @@ module ysyx_25020032_WBU(
                 next_state = state;
             end
         endcase
-        
+
     end
 
     reg [1:0]rresp_latch;
@@ -140,7 +162,7 @@ module ysyx_25020032_WBU(
                         rready <= 1'b1;
                         arsize <= size;
                     end
-                    
+
                     if(valid && mem_wen && idu_valid) begin
                         awvalid <= 1'b1;
                         awaddr <= waddr;
@@ -156,29 +178,27 @@ module ysyx_25020032_WBU(
 
                 // TODO: Need to latch resp
                 READ_WAIT: begin
-                    if(rready && rvalid)
-                        begin
-                            mem_valid <= 1'b1;
-                            rready <= 1'b0;
-                            arvalid <= 1'b0;
-                            rdata_latch <= rdata;
-                            rresp_latch <= rresp;
-                            if(!sram_access && !sdram_access)
-                                difftest_skip_ref();
-                        end
+                    if(rready && rvalid) begin
+                        mem_valid <= 1'b1;
+                        rready <= 1'b0;
+                        arvalid <= 1'b0;
+                        rdata_latch <= rdata;
+                        rresp_latch <= rresp;
+                        if(!sram_access && !sdram_access)
+                            difftest_skip_ref();
+                    end
                 end
 
                 WRITE_WAIT: begin
-                    if(bready && bvalid)
-                        begin
-                            mem_valid <= 1'b1;
-                            bready <= 1'b0;
-                            awvalid <= 1'b0;
-                            wvalid <= 1'b0;
-                            bresp_latch <= bresp;
-                            if(!sram_access && !sdram_access)
-                                difftest_skip_ref();
-                        end
+                    if(bready && bvalid) begin
+                        mem_valid <= 1'b1;
+                        bready <= 1'b0;
+                        awvalid <= 1'b0;
+                        wvalid <= 1'b0;
+                        bresp_latch <= bresp;
+                        if(!sram_access && !sdram_access)
+                            difftest_skip_ref();
+                    end
                 end
 
                 default: begin
@@ -190,7 +210,7 @@ module ysyx_25020032_WBU(
     reg mem_valid;
     assign access_fault = (rresp_latch != 2'b00 || bresp_latch != 2'b00);
 
-// =======================================Memory Read======================================
+    // =======================================Memory Read======================================
 
     reg [31:0] rdata_latch;
 
@@ -207,36 +227,36 @@ module ysyx_25020032_WBU(
          16'b0;
 
     ysyx_25020032_MuxKey #(5, 3, 32) mask_data_mux(
-               mask_data, mem_width, {
-                   3'b000, {{24{lb_data[7]}}, lb_data},
-                   3'b001, {{16{lh_data[15]}}, lh_data},
-                   3'b010, rdata_latch,
-                   3'b100, {{24{1'b0}}, lb_data},
-                   3'b101, {{16{1'b0}}, lh_data}
-               }
-           );
+                             mask_data, mem_width, {
+                                 3'b000, {{24{lb_data[7]}}, lb_data},
+                                 3'b001, {{16{lh_data[15]}}, lh_data},
+                                 3'b010, rdata_latch,
+                                 3'b100, {{24{1'b0}}, lb_data},
+                                 3'b101, {{16{1'b0}}, lh_data}
+                             }
+                         );
 
     wire [2:0] size;
     ysyx_25020032_MuxKey #(5, 3, 3) size_mux(
-               size, mem_width, {
-                   3'b000, 3'b000,
-                   3'b001, 3'b001,
-                   3'b010, 3'b010,
-                   3'b100, 3'b000,
-                   3'b101, 3'b001
-               }
-           );
+                             size, mem_width, {
+                                 3'b000, 3'b000,
+                                 3'b001, 3'b001,
+                                 3'b010, 3'b010,
+                                 3'b100, 3'b000,
+                                 3'b101, 3'b001
+                             }
+                         );
 
     // ==================================================================================
 
     ysyx_25020032_MuxKey #(4, 2, 32) wdata_regd_mux(
-               wdata_regd, wb_sel, {
-                   2'b00, alu_res,
-                   2'b01, pc+4,
-                   2'b10, csr_out,
-                   2'b11, mask_data
-               }
-           );
+                             wdata_regd, wb_sel, {
+                                 2'b00, alu_res,
+                                 2'b01, pc+4,
+                                 2'b10, csr_out,
+                                 2'b11, mask_data
+                             }
+                         );
 
     assign csr_in = csr_write_set ? data_reg1 | csr_out : data_reg1;
 
@@ -248,5 +268,5 @@ module ysyx_25020032_WBU(
 
     export "DPI-C" function wbu_skip;
 
-endmodule
-/* verilator lint_on UNUSEDSIGNAL */
+           endmodule
+           /* verilator lint_on UNUSEDSIGNAL */

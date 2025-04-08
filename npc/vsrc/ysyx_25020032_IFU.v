@@ -1,5 +1,6 @@
 /* verilator lint_off UNUSEDSIGNAL */
-`include "axi_interface.vh"
+`include "axi_interface.vh" 
+`include "common.vh"
 
 module ysyx_25020032_IFU(
         input clk,
@@ -21,6 +22,13 @@ module ysyx_25020032_IFU(
         // AXI interface
         `AXI_MASTER_READ_ADDR_PORTS
     );
+
+`ifdef FETCH_EVENT
+    reg [31:0]fetch_event_cnt;
+    initial begin
+        fetch_event_cnt = 0;
+    end
+`endif
 
     wire [31:0]next_pc = access_fault ? 32'h0000_0000 : (branch_taken ? branch_target : pc+4);
     // PC register
@@ -114,6 +122,9 @@ module ysyx_25020032_IFU(
                         rready <= 1'b0;
                         instr_latch <= rdata;
                         rresp_latch <= rresp;
+                        `ifdef FETCH_EVENT
+                            fetch_event_cnt <= fetch_event_cnt + 1;
+                        `endif
                     end
                 end
 
@@ -124,13 +135,6 @@ module ysyx_25020032_IFU(
     end
 
     assign instr = rresp_latch == 2'b00 ? instr_latch : 32'h0;
-
-    // Alarm simulation environment to stop for ebreak instruction
-    always @(*) begin
-        if(instr == 32'h00100073) begin
-            set_finish();
-        end
-    end
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

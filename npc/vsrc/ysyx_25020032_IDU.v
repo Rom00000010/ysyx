@@ -35,6 +35,47 @@ module ysyx_25020032_IDU(
         output [31:0]mtvec
     );
 
+`ifdef DECODE_EVENT
+    reg [31:0] compute_instr_cnt;
+    reg [31:0] memory_instr_cnt;
+    reg [31:0] csr_instr_cnt;
+    reg [31:0] branch_instr_cnt;
+    reg [31:0] load_instr_cnt;
+    reg [31:0] store_instr_cnt;
+    initial begin
+        compute_instr_cnt = 0;
+        memory_instr_cnt = 0;
+        csr_instr_cnt = 0;
+        branch_instr_cnt = 0;
+        load_instr_cnt = 0;
+        store_instr_cnt = 0;
+    end
+
+    always @(posedge clk) begin
+        if(idu_valid) begin
+            if(opcode == 7'b0010011 || opcode == 7'b0110011 || opcode == 7'b0110111 || opcode == 7'b0010111) begin  
+                compute_instr_cnt <= compute_instr_cnt + 1;
+            end
+            if(opcode == 7'b0100011 || opcode == 7'b0000011) begin
+                memory_instr_cnt <= memory_instr_cnt + 1;
+            end
+            if(opcode == 7'b1110011) begin
+                csr_instr_cnt <= csr_instr_cnt + 1;
+            end
+            if(opcode == 7'b1100011 || opcode == 7'b1101111 || opcode == 7'b1100111) begin
+                branch_instr_cnt <= branch_instr_cnt + 1;
+            end
+            if(opcode == 7'b0000011) begin
+                load_instr_cnt <= load_instr_cnt + 1;
+            end
+            if(opcode == 7'b0100011) begin
+                store_instr_cnt <= store_instr_cnt + 1;
+            end
+        end
+    end
+
+`endif
+    
     always @(*) begin
         if(rst) begin
             idu_valid = 1'b0;
