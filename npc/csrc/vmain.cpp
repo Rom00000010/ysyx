@@ -21,8 +21,8 @@ int depth = 0;
 bool stop = false;
 
 long start_time;
-long long total_cycles = 0;
-double total_instrs = 0;
+unsigned long long total_cycles = 0;
+unsigned long long total_instrs = 0;
 
 vector<uint8_t> mem(16 * 1024 * 1024);
 vector<uint8_t> psram(4 * 1024 * 1024);
@@ -115,8 +115,8 @@ void step_and_dump_wave(unsigned int n)
             SET_WBU
             if (!wbu_skip())
             {
-                SET_TOP
-                ftrace(get_pc_val(), get_instr());
+                // SET_TOP
+                // ftrace(get_pc_val(), get_instr());
                 total_instrs += 1;
             }
         }
@@ -235,9 +235,9 @@ int main(int argc, char **argv)
     std::chrono::duration<double> elapsed = end - start;
 
     double sim_rate = total_cycles / elapsed.count();
-    //std::cout << "仿真速率: " << sim_rate / 1e6 << " MHz" << std::endl;
+    std::cout << "仿真速率: " << sim_rate / 1e6 << " MHz" << std::endl;
 
-    double IPC = total_instrs / total_cycles;
+    double IPC = (double)total_instrs / total_cycles;
     std::cout << "total_instrs: " << total_instrs << std::endl;
     std::cout << "total_cycles: " << total_cycles << std::endl;
     std::cout << "IPC: " << IPC << std::endl;

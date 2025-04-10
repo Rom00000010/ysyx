@@ -1,5 +1,5 @@
 /* verilator lint_off UNUSEDSIGNAL */
-`include "axi_interface.vh" 
+`include "axi_interface.vh"
 `include "common.vh"
 
 module ysyx_25020032_IFU(
@@ -39,15 +39,16 @@ module ysyx_25020032_IFU(
 
     // =================================State Machine===========================================
 
-    localparam IDLE = 2'd0;
-    localparam FETCH = 2'd1;
-    localparam WAIT = 2'd2;
+    localparam INIT = 2'd0;
+    localparam IDLE = 2'd1;
+    localparam FETCH = 2'd2;
+    localparam WAIT = 2'd3;
 
     reg [1:0]state, next_state;
 
     always @(posedge clk or posedge rst) begin
         if(rst)
-            state <= FETCH;
+            state <= INIT;
         else
             state <= next_state;
     end
@@ -55,8 +56,17 @@ module ysyx_25020032_IFU(
     // Next state logic
     always @(*) begin
         next_state = state;
-
+                    if(wbu_valid && ifu_ready) begin
+                        arvalid <= 1'b1;
+                        rready <= 1'b1;
+                        araddr <= next_pc;
+                        instr_latch <= 32'h0;
+                    end
         case (state)
+            INIT: begin
+                    next_state = FETCH;
+            end
+
             IDLE: begin
                 if(wbu_valid && ifu_ready) begin
                     next_state = FETCH;
@@ -73,7 +83,7 @@ module ysyx_25020032_IFU(
                 end
             end
             default: begin
-                next_state = IDLE;
+                next_state = INIT;
             end
         endcase
     end
@@ -97,6 +107,12 @@ module ysyx_25020032_IFU(
         end
         else begin
             case (state)
+                INIT: begin 
+                    arvalid <= 1'b1;
+                    araddr <= pc;
+                    rready <= 1'b1;
+                end
+
                 IDLE: begin
                     ifu_valid <= 1'b0;
                     ifu_ready <= 1'b1;
@@ -108,9 +124,6 @@ module ysyx_25020032_IFU(
                     end
                 end
                 FETCH: begin
-                    arvalid <= 1'b1;
-                    araddr <= pc;
-                    rready <= 1'b1;
                     if(arvalid && arready) begin
                         arvalid <= 1'b0;
                     end
