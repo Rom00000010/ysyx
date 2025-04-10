@@ -212,6 +212,10 @@ module ysyx_25020032 (
                 $display("Access success cycle count: %d", wbu.finish_cnt);
                 $display("Average memory access time: %d", (wbu.extra_cnt / wbu.finish_cnt));
             `endif
+            `ifdef CACHE_EVENT
+                $display("Cache hit count: %d", icache.hit_cnt);
+                $display("Cache miss count: %d", icache.miss_cnt);
+            `endif
             set_finish();
         end
     end
@@ -222,21 +226,44 @@ module ysyx_25020032 (
             .wbu_valid(wbu_valid), .ifu_ready(ifu_ready),
             .branch_taken(branch_taken), .branch_target(branch_target), .access_fault(access_fault),
             .pc(pc), .instr(instr),
-            // AXI interface
-            .arid(ifu_arid),
-            .araddr(ifu_araddr),
-            .arlen(ifu_arlen),
-            .arsize(ifu_arsize),
-            .arburst(ifu_arburst),
-            .arvalid(ifu_arvalid),
-            .arready(ifu_arready),
-            .rid(ifu_rid),
-            .rdata(ifu_rdata),
-            .rresp(ifu_rresp),
-            .rlast(ifu_rlast),
-            .rvalid(ifu_rvalid),
-            .rready(ifu_rready)
+            .cache_valid(cache_valid), .cache_ready(cache_ready),
+            .addr_valid(addr_valid), .addr_ready(addr_ready),
+            .icache_instr(icache_instr)
     );
+
+    wire cache_valid;
+    wire cache_ready;
+    wire addr_valid;
+    wire addr_ready;
+    wire [31:0] icache_instr;
+
+    ysyx_25020032_Icache icache(
+        .clk(clock),
+        .rst(reset),
+        .pc(pc),
+        .instr(icache_instr),
+        .cache_valid(cache_valid),
+        .cache_ready(cache_ready),
+        .addr_valid(addr_valid),
+        .addr_ready(addr_ready),
+        .wbu_valid(wbu_valid),
+        .ifu_ready(ifu_ready),
+        // AXI interface
+        .arid(ifu_arid),
+        .araddr(ifu_araddr),
+        .arlen(ifu_arlen),
+        .arsize(ifu_arsize),
+        .arburst(ifu_arburst),
+        .arvalid(ifu_arvalid),
+        .arready(ifu_arready),
+        .rid(ifu_rid),
+        .rdata(ifu_rdata),
+        .rresp(ifu_rresp),
+        .rlast(ifu_rlast),
+        .rvalid(ifu_rvalid),
+        .rready(ifu_rready)
+    );
+    
 
     // Control signal
     AluCtrl alu_ctrl;

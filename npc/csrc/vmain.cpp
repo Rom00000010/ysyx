@@ -143,6 +143,7 @@ void cpu_exec(unsigned int n)
         uint32_t wbu = wbu_skip();
         SET_TOP
         uint32_t instr = get_instr();
+        uint32_t pc = get_pc_val();
 
         if (wbu)
         {
@@ -151,19 +152,19 @@ void cpu_exec(unsigned int n)
             continue;
         }
 
-        // Print instruction,exec ITRACE
+        // Print instruction,exec ITRACE    
         if (n <= 10)
-        {
-            cout << "0x" << setw(8) << setfill('0') << hex << get_pc_val() << ": ";
+        {   
+            cout << "0x" << setw(8) << setfill('0') << hex << pc << ": ";
             cout << setw(8) << setfill('0') << hex << instr << " ";
             disassembleAndPrint(instr, log_buf, 1);
         }
-        sprintf(log_buf, "0x%08x: %08x\t", get_pc_val(), instr);
+        sprintf(log_buf, "0x%08x: %08x\t", pc, instr);
         disassembleAndPrint(instr, log_buf, 0);
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        difftest_step(get_pc_val());
+        difftest_step(pc);
 
         watchpoint_inspect();
     }

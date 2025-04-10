@@ -6,7 +6,7 @@ module ysyx_25020032_IFU(
         input clk,
         input rst,
 
-        output reg ifu_valid,
+        output ifu_valid,
         input idu_ready,
 
         input wbu_valid,
@@ -17,18 +17,21 @@ module ysyx_25020032_IFU(
         input access_fault,
 
         output [31:0]pc,
-        output reg [31:0]instr,
+        output [31:0]instr,
 
-        // AXI interface
-        `AXI_MASTER_READ_ADDR_PORTS
+        input [31:0] icache_instr,
+        output reg addr_valid,
+        input addr_ready,
+        input cache_valid,
+        output cache_ready
     );
 
-`ifdef FETCH_EVENT
-    reg [31:0]fetch_event_cnt;
-    initial begin
-        fetch_event_cnt = 0;
-    end
-`endif
+    `ifdef FETCH_EVENT
+        reg [31:0]fetch_event_cnt;
+        initial begin
+            fetch_event_cnt = 0;
+        end
+    `endif
 
     wire [31:0]next_pc = access_fault ? 32'h0000_0000 : (branch_taken ? branch_target : pc+4);
     // PC register
@@ -37,117 +40,63 @@ module ysyx_25020032_IFU(
             .din(next_pc), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
 
-    // =================================State Machine===========================================
+    // Initial state: ready to fetch from memory
+    localparam INIT = 2'b00,
+               FETCH = 2'b01;
 
-    localparam INIT = 2'd0;
-    localparam IDLE = 2'd1;
-    localparam FETCH = 2'd2;
-    localparam WAIT = 2'd3;
-
-    reg [1:0]state, next_state;
-
-    always @(posedge clk or posedge rst) begin
-        if(rst)
+    reg [1:0] state, next_state;
+    always @(posedge clk) begin
+        if(rst) begin
             state <= INIT;
-        else
+        end else begin
             state <= next_state;
+        end
     end
 
-    // Next state logic
     always @(*) begin
         next_state = state;
-                    if(wbu_valid && ifu_ready) begin
-                        arvalid <= 1'b1;
-                        rready <= 1'b1;
-                        araddr <= next_pc;
-                        instr_latch <= 32'h0;
-                    end
-        case (state)
+        case(state)
             INIT: begin
-                    next_state = FETCH;
-            end
-
-            IDLE: begin
-                if(wbu_valid && ifu_ready) begin
-                    next_state = FETCH;
-                end
-            end
-            FETCH: begin
-                if(arready && arvalid) begin
-                    next_state = WAIT;
-                end
-            end
-            WAIT: begin
-                if(rvalid && rready) begin
-                    next_state = IDLE;
-                end
+                next_state = FETCH;
             end
             default: begin
-                next_state = INIT;
+                next_state = FETCH;
             end
         endcase
     end
 
-    reg [31:0]instr_latch;
-    reg [1:0]rresp_latch;
-    // Output logic
-    always @(posedge clk or posedge rst) begin
+    always @(posedge clk) begin
         if(rst) begin
-            arvalid <= 1'b0;
-            rready <= 1'b0;
-            ifu_valid <= 1'b0;
-            ifu_ready <= 1'b0;
-            instr_latch <= 32'h0;
-            rresp_latch <= 2'b00;
-            // Set default values for AXI signals
-            arid <= `AXI_DEFAULT_ID;
-            arlen <= `AXI_DEFAULT_LEN;
-            arsize <= `AXI_DEFAULT_SIZE;
-            arburst <= `AXI_DEFAULT_BURST;
+            addr_valid <= 1'b0;
         end
         else begin
-            case (state)
-                INIT: begin 
-                    arvalid <= 1'b1;
-                    araddr <= pc;
-                    rready <= 1'b1;
-                end
-
-                IDLE: begin
-                    ifu_valid <= 1'b0;
-                    ifu_ready <= 1'b1;
-                    if(wbu_valid && ifu_ready) begin
-                        arvalid <= 1'b1;
-                        rready <= 1'b1;
-                        araddr <= next_pc;
-                        instr_latch <= 32'h0;
-                    end
+            case(state)
+                INIT: begin
+                    addr_valid <= 1'b1;
                 end
                 FETCH: begin
-                    if(arvalid && arready) begin
-                        arvalid <= 1'b0;
+                    addr_valid <= 1'b0;
+                    if(wbu_valid && ifu_ready) begin
+                        addr_valid <= 1'b1;
                     end
-                end
-                WAIT: begin
-                    if(rvalid && rready) begin
-                        ifu_valid <= 1'b1;
-                        ifu_ready <= 1'b1;
-                        rready <= 1'b0;
-                        instr_latch <= rdata;
-                        rresp_latch <= rresp;
+                    if(cache_valid && cache_ready) begin
                         `ifdef FETCH_EVENT
                             fetch_event_cnt <= fetch_event_cnt + 1;
                         `endif
                     end
                 end
-
                 default: begin
+                    addr_valid <= 1'b0;
                 end
             endcase
         end
     end
 
-    assign instr = rresp_latch == 2'b00 ? instr_latch : 32'h0;
+    assign cache_ready = 1'b1;
+    assign ifu_valid = cache_valid && cache_ready;
+    assign ifu_ready = 1'b1;
+
+    assign instr = icache_instr;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */
