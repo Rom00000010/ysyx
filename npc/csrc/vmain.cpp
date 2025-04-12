@@ -117,6 +117,8 @@ void step_and_dump_wave(unsigned int n)
             {
                 // SET_TOP
                 // ftrace(get_pc_val(), get_instr());
+                SET_TOP
+                cerr << "0x" <<setw(8)<<setfill('0')<< hex << get_pc_val() << endl;
                 total_instrs += 1;
             }
         }

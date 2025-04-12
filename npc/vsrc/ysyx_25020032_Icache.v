@@ -1,3 +1,4 @@
+`include "axi_interface.vh"
 module ysyx_25020032_Icache(
     input clk,
     input rst,
@@ -7,8 +8,8 @@ module ysyx_25020032_Icache(
     output cache_valid,
     input cache_ready,
 
-    wire wbu_valid,
-    wire ifu_ready,
+    input wbu_valid,
+    input ifu_ready,
 
     input [31:0] pc,
     output [31:0] instr,
@@ -23,6 +24,13 @@ module ysyx_25020032_Icache(
 `ifdef CACHE_EVENT
     reg [31:0] hit_cnt;
     reg [31:0] miss_cnt;
+    reg [31:0] wait_cnt;
+
+    initial begin
+        hit_cnt = 32'h0;
+        miss_cnt = 32'h0;
+        wait_cnt = 32'h0;
+    end
 `endif
 
     // Extract cache index and tag, and check hit
@@ -110,6 +118,7 @@ module ysyx_25020032_Icache(
                         rready <= 1'b1;
                         `ifdef CACHE_EVENT
                             miss_cnt <= miss_cnt + 1;
+                            wait_cnt <= wait_cnt + 1;
                         `endif
                     end else if(hit) begin
                         instr_latch <= cache[cache_index];
@@ -119,12 +128,18 @@ module ysyx_25020032_Icache(
                     end
                 end
                 FETCH: begin
+                    `ifdef CACHE_EVENT
+                        wait_cnt <= wait_cnt + 1;
+                    `endif
                     if(arvalid && arready) begin
                         arvalid <= 1'b0;
                         rready <= 1'b1;
                     end
                 end
                 WAIT: begin
+                    `ifdef CACHE_EVENT
+                        wait_cnt <= wait_cnt + 1;
+                    `endif
                     if(rvalid && rready) begin
                         instr_latch <= rdata;
                         rresp_latch <= rresp;

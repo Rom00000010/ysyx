@@ -215,6 +215,7 @@ module ysyx_25020032 (
             `ifdef CACHE_EVENT
                 $display("Cache hit count: %d", icache.hit_cnt);
                 $display("Cache miss count: %d", icache.miss_cnt);
+                $display("Cache wait cycle count: %d", icache.wait_cnt);
             `endif
             set_finish();
         end
