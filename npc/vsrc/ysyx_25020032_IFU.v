@@ -6,7 +6,7 @@ module ysyx_25020032_IFU(
         input clk,
         input rst,
 
-        output ifu_valid,
+        output reg ifu_valid,
         input idu_ready,
 
         input wbu_valid,
@@ -17,7 +17,7 @@ module ysyx_25020032_IFU(
         input access_fault,
 
         output [31:0]pc,
-        output [31:0]instr,
+        output reg[31:0]instr,
 
         input [31:0] icache_instr,
         output reg addr_valid,
@@ -40,7 +40,7 @@ module ysyx_25020032_IFU(
             .din(next_pc), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
 
-    // Initial state: ready to fetch from memory
+// ======================State Machine=======================
     localparam INIT = 2'b00,
                FETCH = 2'b01;
 
@@ -60,14 +60,16 @@ module ysyx_25020032_IFU(
                 next_state = FETCH;
             end
             default: begin
-                next_state = FETCH;
             end
         endcase
     end
 
+// ======================Output Logic=======================
     always @(posedge clk) begin
         if(rst) begin
             addr_valid <= 1'b0;
+            ifu_valid <= 1'b0;
+            instr <= 32'h0000_0000;
         end
         else begin
             case(state)
@@ -75,28 +77,29 @@ module ysyx_25020032_IFU(
                     addr_valid <= 1'b1;
                 end
                 FETCH: begin
-                    addr_valid <= 1'b0;
+                    ifu_valid <= 1'b0;
                     if(wbu_valid && ifu_ready) begin
                         addr_valid <= 1'b1;
+                        instr <= 32'h0000_0000;
                     end
                     if(cache_valid && cache_ready) begin
+                        addr_valid <= 1'b0;
+                        ifu_valid <= 1'b1;
+                        instr <= icache_instr;
+
                         `ifdef FETCH_EVENT
                             fetch_event_cnt <= fetch_event_cnt + 1;
                         `endif
                     end
                 end
                 default: begin
-                    addr_valid <= 1'b0;
                 end
             endcase
         end
     end
 
-    assign cache_ready = 1'b1;
-    assign ifu_valid = cache_valid && cache_ready;
-    assign ifu_ready = 1'b1;
-
-    assign instr = icache_instr;
+    assign cache_ready = state == FETCH;
+    assign ifu_ready = state == FETCH;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

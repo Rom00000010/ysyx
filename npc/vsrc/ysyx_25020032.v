@@ -213,7 +213,6 @@ module ysyx_25020032 (
                 $display("Average memory access time: %d", (wbu.extra_cnt / wbu.finish_cnt));
             `endif
             `ifdef CACHE_EVENT
-                $display("Cache hit count: %d", icache.hit_cnt);
                 $display("Cache miss count: %d", icache.miss_cnt);
                 $display("Cache wait cycle count: %d", icache.wait_cnt);
             `endif
@@ -247,8 +246,6 @@ module ysyx_25020032 (
         .cache_ready(cache_ready),
         .addr_valid(addr_valid),
         .addr_ready(addr_ready),
-        .wbu_valid(wbu_valid),
-        .ifu_ready(ifu_ready),
         // AXI interface
         .arid(ifu_arid),
         .araddr(ifu_araddr),
