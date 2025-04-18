@@ -124,7 +124,7 @@ module ysyx_25020032_IDU(
 
     ysyx_25020032_Csr csr (
             .clk(clk), .rst(rst),
-            .addr(ext_imm), .csr_out(csr_out), 
+            .addr(ext_imm[11:0]), .csr_out(csr_out), 
             .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid && idu_ready),
             .exception(ecall), .exception_pc(pc), .exception_cause(mcause),
             .mtvec(mtvec), .mepc(mepc)

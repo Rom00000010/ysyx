@@ -1,6 +1,4 @@
 /* verilator lint_off UNUSEDSIGNAL */
-`include "axi_interface.vh"
-`include "common.vh"
 
 module ysyx_25020032_IFU(
         input clk,
@@ -33,18 +31,18 @@ module ysyx_25020032_IFU(
         end
     `endif
 
-    wire [31:0]next_pc = access_fault ? 32'h0000_0000 : (branch_taken ? branch_target : pc+4);
+    wire [31:0]next_pc = access_fault ? 32'h0000_0000 : (branch_taken ? branch_target : pc + 32'd4);
     // PC register
     ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h3000_0000) ) pc_reg (
             .clk(clk), .rst(rst),
             .din(next_pc), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
-
+   
 // ======================State Machine=======================
-    localparam INIT = 2'b00,
-               FETCH = 2'b01;
+    localparam INIT = 1'b0,
+               FETCH = 1'b1;
 
-    reg [1:0] state, next_state;
+    reg state, next_state;
     always @(posedge clk) begin
         if(rst) begin
             state <= INIT;
@@ -59,7 +57,8 @@ module ysyx_25020032_IFU(
             INIT: begin
                 next_state = FETCH;
             end
-            default: begin
+            FETCH: begin
+                next_state = FETCH;
             end
         endcase
     end
@@ -92,14 +91,12 @@ module ysyx_25020032_IFU(
                         `endif
                     end
                 end
-                default: begin
-                end
             endcase
         end
     end
 
-    assign cache_ready = state == FETCH;
-    assign ifu_ready = state == FETCH;
+    assign cache_ready = (state == FETCH) ? 1'b1 : 1'b0;
+    assign ifu_ready = (state == FETCH) ? 1'b1 : 1'b0;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

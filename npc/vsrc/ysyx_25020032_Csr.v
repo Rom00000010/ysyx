@@ -1,53 +1,67 @@
 module ysyx_25020032_Csr (
-  input clk,
-  input rst,
-  
-  input [31:0] addr,
-  input [31:0] csr_in,
-  input csr_wen,
+        input clk,
+        input rst,
 
-  input        exception,    
-  input [31:0] exception_pc,     
-  input [31:0] exception_cause,
+        input [11:0] addr,
+        input [31:0] csr_in,
+        input csr_wen,
 
-  output reg [31:0]mtvec,
-  output reg [31:0]mepc,
-  output reg [31:0] csr_out
-);
-  reg [31:0]mstatus;
-  reg [31:0]mcause;
-  wire [31:0]mvendorid = 32'h79737978;
-  wire [31:0]marchid = 32'h017dc680;
+        input        exception,
+        input [31:0] exception_pc,
+        input [31:0] exception_cause,
 
-  wire [31:0]mask_addr = addr & 32'h00000fff;
+        output reg [31:0]mtvec,
+        output reg [31:0]mepc,
+        output reg [31:0] csr_out
+    );
+    reg [31:0]mstatus;
+    reg [31:0]mcause;
+    wire [31:0]mvendorid = 32'h79737978;
+    wire [31:0]marchid = 32'h017dc680;
 
-  always @(posedge clk or posedge rst) begin
-    if (rst) begin 
-      mstatus <= 32'h1800;  
-      mtvec   <= 32'h0;     
-      mepc    <= 32'h0;      
-      mcause  <= 32'h0;   
+    wire [5:0] csr_sel;
+    assign csr_sel = { addr==12'hf12,  // bit5
+                       addr==12'hf11,  // bit4
+                       addr==12'h342,  // …
+                       addr==12'h341,
+                       addr==12'h300,
+                       addr==12'h305 };
+
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            mstatus <= 32'h1800;
+            mtvec   <= 32'h0;
+            mepc    <= 32'h0;
+            mcause  <= 32'h0;
+        end
+        else if(exception) begin
+            mcause <= exception_cause;
+            mepc   <= exception_pc;
+        end
+        else if (csr_wen) begin
+            mtvec   <= csr_sel[0] ? csr_in : mtvec;
+            mstatus <= csr_sel[1] ? csr_in : mstatus;
+            mepc    <= csr_sel[2] ? csr_in : mepc;
+            mcause  <= csr_sel[3] ? csr_in : mcause;
+        end
     end
-    else if(exception)begin 
-      mcause <= exception_cause;
-      mepc   <= exception_pc;
-    end
-    else if (csr_wen) begin  
-      if(mask_addr == 32'h00000305) mtvec <= csr_in;
-      else if(mask_addr == 32'h00000300) mstatus <= csr_in;
-      else if(mask_addr == 32'h00000341) mepc    <= csr_in;
-      else if(mask_addr == 32'h00000342) mcause  <= csr_in;
-    end
-  end
 
-  ysyx_25020032_MuxKey #(6, 32, 32) out_mux(
-    csr_out, mask_addr, {
-      32'h00000305, mtvec,
-      32'h00000300, mstatus,
-      32'h00000341, mepc,
-      32'h00000342, mcause,
-      32'h00000f11, mvendorid,
-      32'h00000f12, marchid
-    }
-  );
+    always @* begin
+        unique case (1'b1)            // priority‑free one‑hot MUX
+                   csr_sel[0]:
+                       csr_out = mtvec;
+                   csr_sel[1]:
+                       csr_out = mstatus;
+                   csr_sel[2]:
+                       csr_out = mepc;
+                   csr_sel[3]:
+                       csr_out = mcause;
+                   csr_sel[4]:
+                       csr_out = mvendorid;
+                   csr_sel[5]:
+                       csr_out = marchid;
+                   default  :
+                       csr_out = 32'h0;
+               endcase
+           end
 endmodule

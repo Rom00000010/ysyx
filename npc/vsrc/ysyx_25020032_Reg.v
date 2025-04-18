@@ -1,4 +1,3 @@
-// 触发器模板
 module ysyx_25020032_Reg #(WIDTH = 1, RESET_VAL = 0) (
   input clk,
   input rst,
