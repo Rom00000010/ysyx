@@ -71,6 +71,37 @@ module ysyx_25020032 (
         output [3:0] io_slave_bid
 );
 
+`ifndef SYNTHESIS
+    // Alarm simulation environment to stop for ebreak instruction
+    always @(*) begin
+        if(instr == 32'h00100073) begin
+                // Performance Counter
+                `ifdef FETCH_EVENT
+                    $display("Fetch event count: %d", ifu.fetch_event_cnt);
+                `endif
+                `ifdef DECODE_EVENT
+                    $display("Compute instruction count: %d", idu.compute_instr_cnt);
+                    $display("Memory instruction count: %d", idu.memory_instr_cnt);
+                    $display("Load instruction count: %d", idu.load_instr_cnt);
+                    $display("Store instruction count: %d", idu.store_instr_cnt);
+                    $display("CSR instruction count: %d", idu.csr_instr_cnt);
+                    $display("Branch instruction count: %d", idu.branch_instr_cnt);
+                `endif  
+                `ifdef MEMORY_EVENT
+                    $display("Memory Extra cycle count: %d", wbu.extra_cnt);
+                    $display("Wait cycle count: %d", wbu.extra_cnt - wbu.finish_cnt);
+                    $display("Access success cycle count: %d", wbu.finish_cnt);
+                    $display("Average memory access time: %d", (wbu.extra_cnt / wbu.finish_cnt));
+                `endif
+                `ifdef CACHE_EVENT
+                    $display("Cache miss count: %d", icache.miss_cnt);
+                    $display("Cache wait cycle count: %d", icache.wait_cnt);
+                `endif
+                set_finish();
+        end
+    end
+`endif
+
     wire ifu_ready;
     wire ifu_valid;
     wire idu_ready;
@@ -79,288 +110,160 @@ module ysyx_25020032 (
     wire exu_valid;
     wire wbu_ready;
     wire wbu_valid;
+    wire icache_valid;
+    wire icache_ready;
 
-    wire [31:0]pc;
-    wire [31:0]instr;
-
-    // IFU AXI signals
-    wire [31:0] ifu_araddr;
-    wire ifu_arvalid;
-    wire ifu_arready;
-    wire [31:0] ifu_rdata;
-    wire [1:0] ifu_rresp;
-    wire ifu_rvalid;
-    wire ifu_rready;
-    wire [3:0] ifu_arid;
-    wire [7:0] ifu_arlen;
-    wire [2:0] ifu_arsize;
-    wire [1:0] ifu_arburst;
-    wire [3:0] ifu_rid;
-    wire ifu_rlast;
-
-    // WBU AXI signals
-    wire [31:0] wbu_araddr;
-    wire wbu_arvalid;
-    wire wbu_arready;
-    wire [31:0] wbu_rdata;
-    wire [1:0] wbu_rresp;
-    wire wbu_rvalid;
-    wire wbu_rready;
-    wire [31:0] wbu_awaddr;
-    wire wbu_awvalid;
-    wire wbu_awready;
-    wire [31:0] wbu_wdata;
-    wire [3:0] wbu_wstrb;
-    wire wbu_wvalid;
-    wire wbu_wready;
-    wire wbu_bvalid;
-    wire [1:0] wbu_bresp;
-    wire wbu_bready;
-    wire [3:0] wbu_arid;
-    wire [7:0] wbu_arlen;
-    wire [2:0] wbu_arsize;
-    wire [1:0] wbu_arburst;
-    wire [3:0] wbu_awid;
-    wire [7:0] wbu_awlen;
-    wire [2:0] wbu_awsize;
-    wire [1:0] wbu_awburst;
-    wire [3:0] wbu_bid;
-    wire [3:0] wbu_rid;
-    wire wbu_rlast;
-    wire wbu_wlast;
-
-    // CLINT AXI signals
-    wire [31:0] clint_araddr;
-    wire clint_arvalid;
-    wire clint_arready;
-    wire [31:0] clint_rdata;
-    wire [1:0] clint_rresp;
-    wire clint_rvalid;
-    wire clint_rready;
-    wire [31:0] clint_awaddr;
-    wire clint_awvalid;
-    wire clint_awready;
-    wire [31:0] clint_wdata;
-    wire [3:0] clint_wstrb;
-    wire clint_wvalid;
-    wire clint_wready;
-    wire [1:0] clint_bresp;
-    wire clint_bvalid;
-    wire clint_bready;
-    wire [3:0] clint_arid;
-    wire [7:0] clint_arlen;
-    wire [2:0] clint_arsize;
-    wire [1:0] clint_arburst;
-    wire [3:0] clint_rid;
-    wire clint_rlast;
-    wire [3:0] clint_awid;
-    wire [7:0] clint_awlen;
-    wire [2:0] clint_awsize;
-    wire [1:0] clint_awburst;
-    wire clint_wlast;
-    wire [3:0] clint_bid;
-
-    // Xbar AXI signals
-    wire [31:0] xbar_araddr;
-    wire xbar_arvalid;
-    wire xbar_arready;
-    wire [31:0] xbar_rdata;
-    wire [1:0] xbar_rresp;
-    wire xbar_rvalid;
-    wire xbar_rready;
-    wire [31:0] xbar_awaddr;
-    wire xbar_awvalid;
-    wire xbar_awready;
-    wire [31:0] xbar_wdata;
-    wire [3:0] xbar_wstrb;
-    wire xbar_wvalid;
-    wire xbar_wready;
-    wire [1:0] xbar_bresp;
-    wire xbar_bvalid;
-    wire xbar_bready;
-    wire [3:0] xbar_arid;
-    wire [7:0] xbar_arlen;
-    wire [2:0] xbar_arsize;
-    wire [1:0] xbar_arburst;
-    wire [3:0] xbar_awid;
-    wire [7:0] xbar_awlen;
-    wire [2:0] xbar_awsize;
-    wire [1:0] xbar_awburst;
-    wire [3:0] xbar_rid;
-    wire xbar_rlast;
-    wire [3:0] xbar_bid;
-    wire xbar_wlast;
-
-    integer total_instr_cnt;
-    // Alarm simulation environment to stop for ebreak instruction
-    always @(*) begin
-        if(instr == 32'h00100073) begin
-            `ifdef FETCH_EVENT
-                $display("Fetch event count: %d", ifu.fetch_event_cnt);
-            `endif
-            `ifdef DECODE_EVENT
-                $display("Compute instruction count: %d", idu.compute_instr_cnt);
-                $display("Memory instruction count: %d", idu.memory_instr_cnt);
-                $display("Load instruction count: %d", idu.load_instr_cnt);
-                $display("Store instruction count: %d", idu.store_instr_cnt);
-                $display("CSR instruction count: %d", idu.csr_instr_cnt);
-                $display("Branch instruction count: %d", idu.branch_instr_cnt);
-            `endif  
-            `ifdef MEMORY_EVENT
-                $display("Memory Extra cycle count: %d", wbu.extra_cnt);
-                $display("Wait cycle count: %d", wbu.extra_cnt - wbu.finish_cnt);
-                $display("Access success cycle count: %d", wbu.finish_cnt);
-                $display("Average memory access time: %d", (wbu.extra_cnt / wbu.finish_cnt));
-            `endif
-            `ifdef CACHE_EVENT
-                $display("Cache miss count: %d", icache.miss_cnt);
-                $display("Cache wait cycle count: %d", icache.wait_cnt);
-            `endif
-            set_finish();
-        end
-    end
-    
-    ysyx_25020032_IFU ifu(
-            .clk(clock), .rst(reset), 
-            .ifu_valid(ifu_valid), .idu_ready(idu_ready),
-            .wbu_valid(wbu_valid), .ifu_ready(ifu_ready),
-            .branch_taken(branch_taken), .branch_target(branch_target), .access_fault(access_fault),
-            .pc(pc), .instr(instr),
-            .cache_valid(cache_valid), .cache_ready(cache_ready),
-            .addr_valid(addr_valid), .addr_ready(addr_ready),
-            .icache_instr(icache_instr)
-    );
-
-    wire cache_valid;
-    wire cache_ready;
-    wire addr_valid;
-    wire addr_ready;
     wire [31:0] icache_instr;
 
     ysyx_25020032_Icache icache(
         .clk(clock),
         .rst(reset),
+
         .pc(pc),
         .instr(icache_instr),
-        .cache_valid(cache_valid),
-        .cache_ready(cache_ready),
-        .addr_valid(addr_valid),
-        .addr_ready(addr_ready),
+        .icache_valid(icache_valid),
+        .icache_ready(icache_ready),
+
         // AXI interface
-        .arid(ifu_arid),
-        .araddr(ifu_araddr),
-        .arlen(ifu_arlen),
-        .arsize(ifu_arsize),
-        .arburst(ifu_arburst),
-        .arvalid(ifu_arvalid),
-        .arready(ifu_arready),
-        .rid(ifu_rid),
-        .rdata(ifu_rdata),
-        .rresp(ifu_rresp),
-        .rlast(ifu_rlast),
-        .rvalid(ifu_rvalid),
-        .rready(ifu_rready)
+        .arid(ifu_arid), .arlen(ifu_arlen), .arburst(ifu_arburst), 
+        .arsize(ifu_arsize), .araddr(ifu_araddr), .arvalid(ifu_arvalid), .arready(ifu_arready),
+
+        .rid(ifu_rid), .rlast(ifu_rlast),
+        .rvalid(ifu_rvalid), .rready(ifu_rready), .rdata(ifu_rdata), .rresp(ifu_rresp)
+    );
+
+    wire [31:0]pc;
+    wire [31:0]instr;
+    
+    ysyx_25020032_IFU ifu(
+            .clk(clock), .rst(reset), 
+
+            .ifu_valid(ifu_valid), .idu_ready(idu_ready),
+            .pc(pc), .instr(instr),
+
+            .wbu_valid(wbu_valid), .ifu_ready(ifu_ready),
+            .branch_taken(branch_taken), .branch_target(branch_target),
+
+            .icache_valid(icache_valid), .icache_ready(icache_ready),
+            .icache_instr(icache_instr)
     );
     
-
     // Control signal
     AluCtrl alu_ctrl;
     wire [1:0]alu_srca;
     wire [1:0]alu_srcb;
-    wire [2:0]mem_width;
     Branch branch_type;
-    wire [1:0]wb_sel;
+    wire [2:0]mem_width;
     wire mem_wen;
     wire valid;
+    wire [1:0]wb_sel;
     wire csr_write_set;
 
     // Operand 
-    wire [31:0]data_reg1, data_reg2;
     wire [31:0]ext_imm;
-
+    wire [31:0]data_reg1, data_reg2;
     // Csr 
     wire [31:0]csr_out;
-    wire [31:0]mtvec;
     wire [31:0]mepc;
-
-    // Writeback result
-    wire [31:0]csr_in, wdata_regd;
+    wire [31:0]mtvec;
+    // if-id pipeline register
+    wire [31:0]if_id_pc;
 
     ysyx_25020032_IDU idu (
             .clk(clock), .rst(reset), 
+
             .instr(instr), .pc(pc),
-            .wdata_regd(wdata_regd), .csr_in(csr_in), 
             .ifu_valid(ifu_valid), .idu_ready(idu_ready),
-            .idu_valid(idu_valid),  .exu_ready(exu_ready), .wbu_valid(wbu_valid),
+
+            .idu_valid(idu_valid),  .exu_ready(exu_ready), 
+            .if_id_pc(if_id_pc),
             .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
             .branch_type(branch_type), .wb_sel(wb_sel), 
             .mem_wen(mem_wen), .valid(valid), .mem_width(mem_width),
             .ext_imm(ext_imm), .data_reg1(data_reg1), .data_reg2(data_reg2), 
-            .csr_out(csr_out), .mepc(mepc), .mtvec(mtvec), .csr_write_set(csr_write_set)
+            .csr_out(csr_out), .mepc(mepc), .mtvec(mtvec), .csr_write_set(csr_write_set),
+
+            .wbu_valid(wbu_valid), .wdata_regd(wdata_regd), .csr_in(csr_in)
     );
 
     wire [31:0]alu_res;
-    wire branch_taken;
-    wire [31:0]branch_target;
     wire [31:0]raddr;
-    wire [31:0]waddr;
     wire [31:0]wdata;
-    wire [3:0]wmask;
+    wire [3:0] wmask;
+
+    wire [3:0] id_ex_branch_type;
+    wire [2:0] id_ex_mem_width;
+    wire       id_ex_mem_wen;
+    wire       id_ex_valid;
+    wire [1:0] id_ex_wb_sel;
+    wire       id_ex_csr_write_set;
+
+    wire [31:0] id_ex_ext_imm;
+    wire [31:0] id_ex_data_reg1;
+    wire [31:0] id_ex_csr_out;
+    wire [31:0] id_ex_mepc;
+    wire [31:0] id_ex_mtvec;
+    wire [31:0] id_ex_pc;
+
     ysyx_25020032_EXU exu(  
             .clk(clock), .rst(reset),
+
             .idu_valid(idu_valid), .exu_ready(exu_ready), 
-            .exu_valid(exu_valid), .wbu_ready(wbu_ready), 
-            .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
+
             .alu_ctrl(alu_ctrl), .branch_type(branch_type), .mem_width(mem_width),
-            .data_reg1(data_reg1), .data_reg2(data_reg2), 
-            .pc(pc), .ext_imm(ext_imm), 
+            .valid(valid), .mem_wen(mem_wen), .csr_write_set(csr_write_set), .wb_sel(wb_sel),
+
+            .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
+            .data_reg1(data_reg1), .data_reg2(data_reg2), .csr_out(csr_out),
+            .pc(if_id_pc), .ext_imm(ext_imm), 
             .mepc(mepc), .mtvec(mtvec),
-            .alu_res(alu_res), .branch_taken(branch_taken), .branch_target(branch_target),
-            .raddr(raddr), .waddr(waddr), .wdata(wdata), .wmask(wmask)
+
+            .exu_valid(exu_valid), .wbu_ready(wbu_ready), 
+
+            .alu_res(alu_res), .raddr(raddr), .wdata(wdata), .wmask(wmask),
+
+            .id_ex_pc(id_ex_pc), .id_ex_data_reg1(id_ex_data_reg1), .id_ex_ext_imm(id_ex_ext_imm), .id_ex_mtvec(id_ex_mtvec), .id_ex_mepc(id_ex_mepc),
+
+            .id_ex_valid(id_ex_valid), .id_ex_mem_wen(id_ex_mem_wen), .id_ex_mem_width(id_ex_mem_width), .id_ex_wb_sel(id_ex_wb_sel), .id_ex_csr_write_set(id_ex_csr_write_set), .id_ex_branch_type(id_ex_branch_type), .id_ex_csr_out(id_ex_csr_out)
     );
 
+    // Writeback result
+    wire [31:0]csr_in, wdata_regd;
+
     wire access_fault;
+    wire branch_taken;
+    wire [31:0]branch_target;
     ysyx_25020032_WBU wbu(
         .clk(clock), .rst(reset),
-        .exu_valid(exu_valid), .wbu_ready(wbu_ready), .idu_valid(idu_valid), 
+
+        .exu_valid(exu_valid), .wbu_ready(wbu_ready),
+
+        .valid(id_ex_valid), .mem_wen(id_ex_mem_wen), 
+        .wb_sel(id_ex_wb_sel), .csr_write_set(id_ex_csr_write_set), .mem_width(id_ex_mem_width), .branch_type(id_ex_branch_type),
+        .csr_out(id_ex_csr_out), .pc(id_ex_pc), 
+        .data_reg1(id_ex_data_reg1), .ext_imm(id_ex_ext_imm), .mtvec(id_ex_mtvec), .mepc(id_ex_mepc),
+        .raddr(raddr), .wrdata(wdata), .wmask(wmask), .alu_res(alu_res), 
+
         .wbu_valid(wbu_valid), .idu_ready(idu_ready),
-        .valid(valid), .mem_wen(mem_wen), 
-        .wb_sel(wb_sel), .csr_write_set(csr_write_set), .mem_width(mem_width),
-        .alu_res(alu_res), .pc(pc),  
-        .data_reg1(data_reg1), 
-        .waddr(waddr), .raddr(raddr), .wrdata(wdata), .wmask(wmask),
-        .csr_out(csr_out), 
+
         .wdata_regd(wdata_regd), .csr_in(csr_in), .access_fault(access_fault), 
+        .branch_taken(branch_taken), .branch_target(branch_target),
+
         // AXI interface
-        .arid(wbu_arid),
-        .araddr(wbu_araddr),
-        .arlen(wbu_arlen),
-        .arsize(wbu_arsize),
-        .arburst(wbu_arburst),
-        .arvalid(wbu_arvalid),
-        .arready(wbu_arready),
-        .rid(wbu_rid),
-        .rdata(wbu_rdata),
-        .rresp(wbu_rresp),
-        .rlast(wbu_rlast),
-        .rvalid(wbu_rvalid),
-        .rready(wbu_rready),
-        .awid(wbu_awid),
-        .awaddr(wbu_awaddr),
-        .awlen(wbu_awlen),
-        .awsize(wbu_awsize),
-        .awburst(wbu_awburst),
-        .awvalid(wbu_awvalid),
-        .awready(wbu_awready),
-        .wdata(wbu_wdata),
-        .wstrb(wbu_wstrb),
+        .arid(wbu_arid), .arburst(wbu_arburst), .arlen(wbu_arlen),
+        .araddr(wbu_araddr), .arsize(wbu_arsize), .arvalid(wbu_arvalid), .arready(wbu_arready),
+
+        .rid(wbu_rid), .rlast(wbu_rlast),
+        .rdata(wbu_rdata), .rresp(wbu_rresp), .rvalid(wbu_rvalid), .rready(wbu_rready),
+
+        .awid(wbu_awid), .awlen(wbu_awlen), .awburst(wbu_awburst),
+        .awaddr(wbu_awaddr), .awsize(wbu_awsize), .awvalid(wbu_awvalid), .awready(wbu_awready),
+
+        .wdata(wbu_wdata), .wstrb(wbu_wstrb), .wvalid(wbu_wvalid), .wready(wbu_wready),
         .wlast(wbu_wlast),
-        .wvalid(wbu_wvalid),
-        .wready(wbu_wready),
+        
         .bid(wbu_bid),
-        .bresp(wbu_bresp),
-        .bvalid(wbu_bvalid),
-        .bready(wbu_bready)
+        .bresp(wbu_bresp), .bvalid(wbu_bvalid), .bready(wbu_bready)
     );
 
     // Instantiate the arbiter
@@ -579,6 +482,114 @@ module ysyx_25020032 (
         .bready(clint_bready)
     );
 
+    // IFU AXI signals
+    wire [31:0] ifu_araddr;
+    wire ifu_arvalid;
+    wire ifu_arready;
+    wire [31:0] ifu_rdata;
+    wire [1:0] ifu_rresp;
+    wire ifu_rvalid;
+    wire ifu_rready;
+    wire [3:0] ifu_arid;
+    wire [7:0] ifu_arlen;
+    wire [2:0] ifu_arsize;
+    wire [1:0] ifu_arburst;
+    wire [3:0] ifu_rid;
+    wire ifu_rlast;
+
+    // WBU AXI signals
+    wire [31:0] wbu_araddr;
+    wire wbu_arvalid;
+    wire wbu_arready;
+    wire [31:0] wbu_rdata;
+    wire [1:0] wbu_rresp;
+    wire wbu_rvalid;
+    wire wbu_rready;
+    wire [31:0] wbu_awaddr;
+    wire wbu_awvalid;
+    wire wbu_awready;
+    wire [31:0] wbu_wdata;
+    wire [3:0] wbu_wstrb;
+    wire wbu_wvalid;
+    wire wbu_wready;
+    wire wbu_bvalid;
+    wire [1:0] wbu_bresp;
+    wire wbu_bready;
+    wire [3:0] wbu_arid;
+    wire [7:0] wbu_arlen;
+    wire [2:0] wbu_arsize;
+    wire [1:0] wbu_arburst;
+    wire [3:0] wbu_awid;
+    wire [7:0] wbu_awlen;
+    wire [2:0] wbu_awsize;
+    wire [1:0] wbu_awburst;
+    wire [3:0] wbu_bid;
+    wire [3:0] wbu_rid;
+    wire wbu_rlast;
+    wire wbu_wlast;
+
+    // CLINT AXI signals
+    wire [31:0] clint_araddr;
+    wire clint_arvalid;
+    wire clint_arready;
+    wire [31:0] clint_rdata;
+    wire [1:0] clint_rresp;
+    wire clint_rvalid;
+    wire clint_rready;
+    wire [31:0] clint_awaddr;
+    wire clint_awvalid;
+    wire clint_awready;
+    wire [31:0] clint_wdata;
+    wire [3:0] clint_wstrb;
+    wire clint_wvalid;
+    wire clint_wready;
+    wire [1:0] clint_bresp;
+    wire clint_bvalid;
+    wire clint_bready;
+    wire [3:0] clint_arid;
+    wire [7:0] clint_arlen;
+    wire [2:0] clint_arsize;
+    wire [1:0] clint_arburst;
+    wire [3:0] clint_rid;
+    wire clint_rlast;
+    wire [3:0] clint_awid;
+    wire [7:0] clint_awlen;
+    wire [2:0] clint_awsize;
+    wire [1:0] clint_awburst;
+    wire clint_wlast;
+    wire [3:0] clint_bid;
+
+    // Xbar AXI signals
+    wire [31:0] xbar_araddr;
+    wire xbar_arvalid;
+    wire xbar_arready;
+    wire [31:0] xbar_rdata;
+    wire [1:0] xbar_rresp;
+    wire xbar_rvalid;
+    wire xbar_rready;
+    wire [31:0] xbar_awaddr;
+    wire xbar_awvalid;
+    wire xbar_awready;
+    wire [31:0] xbar_wdata;
+    wire [3:0] xbar_wstrb;
+    wire xbar_wvalid;
+    wire xbar_wready;
+    wire [1:0] xbar_bresp;
+    wire xbar_bvalid;
+    wire xbar_bready;
+    wire [3:0] xbar_arid;
+    wire [7:0] xbar_arlen;
+    wire [2:0] xbar_arsize;
+    wire [1:0] xbar_arburst;
+    wire [3:0] xbar_awid;
+    wire [7:0] xbar_awlen;
+    wire [2:0] xbar_awsize;
+    wire [1:0] xbar_awburst;
+    wire [3:0] xbar_rid;
+    wire xbar_rlast;
+    wire [3:0] xbar_bid;
+    wire xbar_wlast;
+
     // Set all slave interface outputs to zero since core won't be a slave
     assign io_slave_arready = 1'b0;
     assign io_slave_rdata = 32'b0;
@@ -592,6 +603,7 @@ module ysyx_25020032 (
     assign io_slave_bvalid = 1'b0;
     assign io_slave_bid = 4'b0;
 
+`ifndef SYNTHESIS
     function automatic int get_dnpc();
         get_dnpc = branch_target;
     endfunction
@@ -607,6 +619,6 @@ module ysyx_25020032 (
     export "DPI-C" function get_dnpc;
     export "DPI-C" function get_instr;
     export "DPI-C" function get_pc_val;
-
+`endif
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

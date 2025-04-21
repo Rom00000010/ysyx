@@ -1,27 +1,23 @@
-/* verilator lint_off UNUSEDSIGNAL */
-
 module ysyx_25020032_IFU(
         input clk,
         input rst,
 
+        // IFU->IDU synchronization
         output reg ifu_valid,
         input idu_ready,
-
-        input wbu_valid,
-        output reg ifu_ready,
-
-        input branch_taken,
-        input [31:0]branch_target,
-        input access_fault,
-
-        output [31:0]pc,
         output reg[31:0]instr,
 
+        // WBU->IFU synchronization
+        input wbu_valid,
+        output reg ifu_ready,
+        input branch_taken,
+        input [31:0]branch_target,
+
+        // IFU->ICache synchronization
+        output [31:0]pc,
         input [31:0] icache_instr,
-        output reg addr_valid,
-        input addr_ready,
-        input cache_valid,
-        output cache_ready
+        output reg icache_valid,
+        input icache_ready
     );
 
     `ifdef FETCH_EVENT
@@ -31,18 +27,19 @@ module ysyx_25020032_IFU(
         end
     `endif
 
-    wire [31:0]next_pc = access_fault ? 32'h0000_0000 : (branch_taken ? branch_target : pc + 32'd4);
+    wire [31:0]next_pc = branch_taken ? branch_target : pc + 32'd4;
     // PC register
     ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h3000_0000) ) pc_reg (
             .clk(clk), .rst(rst),
             .din(next_pc), .dout(pc), .wen(wbu_valid && ifu_ready)
         );
-   
-// ======================State Machine=======================
-    localparam INIT = 1'b0,
-               FETCH = 1'b1;
 
-    reg state, next_state;
+// ======================State Machine=======================
+    localparam INIT = 2'b00,
+               FETCH = 2'b01,
+               IDLE = 2'b10;
+
+    reg [1:0] state, next_state;
     always @(posedge clk) begin
         if(rst) begin
             state <= INIT;
@@ -58,31 +55,33 @@ module ysyx_25020032_IFU(
                 next_state = FETCH;
             end
             FETCH: begin
-                next_state = FETCH;
+                if(icache_valid && icache_ready) begin
+                    next_state = IDLE;
+                end
             end
+            IDLE: begin
+                if(wbu_valid && ifu_ready) begin
+                    next_state = FETCH;
+                end
+            end
+            default: begin end
         endcase
     end
 
 // ======================Output Logic=======================
     always @(posedge clk) begin
         if(rst) begin
-            addr_valid <= 1'b0;
+            icache_valid <= 1'b0;
             ifu_valid <= 1'b0;
-            instr <= 32'h0000_0000;
         end
         else begin
             case(state)
                 INIT: begin
-                    addr_valid <= 1'b1;
+                    icache_valid <= 1'b1;
                 end
                 FETCH: begin
-                    ifu_valid <= 1'b0;
-                    if(wbu_valid && ifu_ready) begin
-                        addr_valid <= 1'b1;
-                        instr <= 32'h0000_0000;
-                    end
-                    if(cache_valid && cache_ready) begin
-                        addr_valid <= 1'b0;
+                    if(icache_valid && icache_ready) begin
+                        icache_valid <= 1'b0;
                         ifu_valid <= 1'b1;
                         instr <= icache_instr;
 
@@ -91,12 +90,17 @@ module ysyx_25020032_IFU(
                         `endif
                     end
                 end
+                IDLE: begin
+                    ifu_valid <= 1'b0;
+                    if(wbu_valid && ifu_ready) begin
+                        icache_valid <= 1'b1;
+                    end
+                end
+                default: begin end
             endcase
         end
     end
 
-    assign cache_ready = (state == FETCH) ? 1'b1 : 1'b0;
-    assign ifu_ready = (state == FETCH) ? 1'b1 : 1'b0;
+    assign ifu_ready = (state == IDLE) ? 1'b1 : 1'b0;
 
 endmodule
-/* verilator lint_on UNUSEDSIGNAL */

@@ -1,38 +1,44 @@
 `include "common.vh"
-/* verilator lint_off UNUSEDSIGNAL */
 module ysyx_25020032_IDU(
         input clk,
         input rst,
 
+        // IFU->IDU synchronization
         input ifu_valid,
-        input wbu_valid,
         output reg idu_ready,
-
-        output reg idu_valid,
-        input exu_ready,
-
         input [31:0]instr,
         input [31:0]pc,
 
-        input [31:0]wdata_regd,
-        input [31:0]csr_in,
+        // if-id pipeline register, store pc for later exu/wbu
+        output reg [31:0]if_id_pc,
 
+        // IDU->EXU synchronization
+        output reg idu_valid,
+        input exu_ready,
+
+        // Control logic
         output AluCtrl alu_ctrl,
         output [1:0]alu_srca,
         output [1:0]alu_srcb,
-        output [1:0]wb_sel,
-        output [2:0]mem_width,
         output Branch branch_type,
+        output [2:0]mem_width,
         output mem_wen,
         output valid,
+        output [1:0]wb_sel,
         output csr_write_set,
 
+        // Datapath
         output [31:0]ext_imm,
         output [31:0]data_reg1,
         output [31:0]data_reg2,
         output [31:0]csr_out,
         output [31:0]mepc,
-        output [31:0]mtvec
+        output [31:0]mtvec,
+
+        // WBU->IDU synchronization
+        input wbu_valid,
+        input [31:0]wdata_regd,
+        input [31:0]csr_in
     );
 
 `ifdef DECODE_EVENT
@@ -73,26 +79,32 @@ module ysyx_25020032_IDU(
             end
         end
     end
-
 `endif
     
-    always @(*) begin
+    reg [31:0]if_id_instr;
+    always @(posedge clk) begin
         if(rst) begin
-            idu_valid = 1'b0;
-            idu_ready = 1'b0;
+            idu_valid <= 1'b0;
+            idu_ready <= 1'b0;
         end
-
         else begin
-            idu_valid = idu_ready && ifu_valid;
-            idu_ready = 1'b1;
+            idu_ready <= 1'b1;
+            if(ifu_valid && idu_ready) begin
+                idu_valid <= 1'b1;
+                if_id_pc <= pc;
+                if_id_instr <= instr;
+            end
+            else begin
+                idu_valid <= 1'b0;
+            end
         end
     end
 
     // Extract instruction fields
-    wire [2:0] func3 = instr[14:12];
-    wire [11:0] func12 = instr[31:20];
-    wire func7 = instr[30];
-    wire [6:0] opcode = instr[6:0];
+    wire [2:0] func3 = if_id_instr[14:12];
+    wire [11:0] func12 = if_id_instr[31:20];
+    wire func7 = if_id_instr[30];
+    wire [6:0] opcode = if_id_instr[6:0];
 
     // Special signal for load, store, ecall or mret
     assign valid = ((opcode == 7'b0000011) || (opcode == 7'b0100011));
@@ -103,12 +115,12 @@ module ysyx_25020032_IDU(
     // Extend immediate
     wire shamt = (opcode == 7'b0010011) && (func3 == 3'b101 || func3 == 3'b001);
 
-    ysyx_25020032_Ext extender (.imm_src(imm_src), .instr(instr), .shamt(shamt), .imm(ext_imm));
+    ysyx_25020032_Ext extender (.imm_src(imm_src), .instr(if_id_instr), .shamt(shamt), .imm(ext_imm));
 
     // Fetch Operand
-    wire [3:0] rs1 = instr[18:15];
-    wire [3:0] rs2 = instr[23:20];
-    wire [3:0] rd = instr[10:7];
+    wire [3:0] rs1 = if_id_instr[18:15];
+    wire [3:0] rs2 = if_id_instr[23:20];
+    wire [3:0] rd = if_id_instr[10:7];
 
     ysyx_25020032_RegisterFile #(.ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
                      .clk(clk), .rst(rst),
@@ -126,7 +138,7 @@ module ysyx_25020032_IDU(
             .clk(clk), .rst(rst),
             .addr(ext_imm[11:0]), .csr_out(csr_out), 
             .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid && idu_ready),
-            .exception(ecall), .exception_pc(pc), .exception_cause(mcause),
+            .exception(ecall), .exception_pc(if_id_pc), .exception_cause(mcause),
             .mtvec(mtvec), .mepc(mepc)
         );
 
@@ -264,4 +276,3 @@ module ysyx_25020032_IDU(
            );
 
 endmodule
-/* verilator lint_on UNUSEDSIGNAL */

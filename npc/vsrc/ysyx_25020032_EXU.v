@@ -3,100 +3,112 @@ module ysyx_25020032_EXU(
         input clk,
         input rst,
 
+        // IDU->EXU synchronization
         input idu_valid,
         output reg exu_ready,
 
-        output reg exu_valid,
-        input wbu_ready,
-
+        input [3:0]alu_ctrl,
         input [1:0]alu_srca,
         input [1:0]alu_srcb,
-        input [3:0]alu_ctrl,
         input Branch branch_type,
         input [2:0]mem_width,
+        input mem_wen,
+        input valid,
+        input [1:0]wb_sel,
+        input csr_write_set,
 
+        input [31:0]ext_imm,
         input [31:0]data_reg1,
         input [31:0]data_reg2,
-        input [31:0]ext_imm,
-        input [31:0]pc,
-        input [31:0]mtvec,
+        input [31:0]csr_out,
         input [31:0]mepc,
+        input [31:0]mtvec,
+        input [31:0]pc,
+
+        // EXU->WBU synchronization
+        output reg exu_valid,
+        input wbu_ready,
+        
+        output reg [3:0] id_ex_branch_type,
+        output reg [2:0] id_ex_mem_width,
+        output reg id_ex_mem_wen,
+        output reg id_ex_valid,
+        output reg [1:0] id_ex_wb_sel,
+        output reg id_ex_csr_write_set,
+
+        output reg [31:0] id_ex_ext_imm,
+        output reg [31:0] id_ex_data_reg1,
+        output reg [31:0] id_ex_csr_out,
+        output reg [31:0] id_ex_mepc,
+        output reg [31:0] id_ex_mtvec,
+        output reg [31:0] id_ex_pc,
 
         output wire [31:0]alu_res,
-        output [31:0]branch_target,
-        output branch_taken,
-
-        output [31:0]waddr,
         output [31:0]raddr,
         output [31:0]wdata,
         output [3:0]wmask
     );
 
-    always @(*) begin
+    reg [3:0] id_ex_alu_ctrl;
+    reg [1:0] id_ex_alu_srca;
+    reg [1:0] id_ex_alu_srcb;
+    reg [31:0] id_ex_data_reg2;
+
+    always @(posedge clk) begin
         if(rst) begin
-            exu_valid = 1'b0;
-            exu_ready = 1'b0;
+            exu_valid <= 1'b0;
+            exu_ready <= 1'b0;
         end
         else begin
-            exu_valid = idu_valid && exu_ready;
-            exu_ready = 1'b1;
+            exu_ready <= 1'b1;
+            if(idu_valid && exu_ready) begin
+                exu_valid <= 1'b1;
+                id_ex_alu_ctrl <= alu_ctrl;
+                id_ex_alu_srca <= alu_srca;
+                id_ex_alu_srcb <= alu_srcb;
+                id_ex_branch_type <= branch_type;
+                id_ex_mem_width <= mem_width;
+                id_ex_mem_wen <= mem_wen;
+                id_ex_valid <= valid;
+                id_ex_wb_sel <= wb_sel;
+                id_ex_csr_write_set <= csr_write_set;
+
+                id_ex_ext_imm <= ext_imm;
+                id_ex_data_reg1 <= data_reg1;
+                id_ex_data_reg2 <= data_reg2;
+                id_ex_csr_out <= csr_out;
+                id_ex_mepc <= mepc;
+                id_ex_mtvec <= mtvec;
+                id_ex_pc <= pc;
+            end
+            else begin
+                exu_valid <= 1'b0;
+            end
         end
     end
 
     wire [31:0]opl;
     ysyx_25020032_MuxKey #(3, 2, 32) op1 (
-               opl, alu_srca,{
-                   2'b00, data_reg1,
+               opl, id_ex_alu_srca,{
+                   2'b00, id_ex_data_reg1,
                    2'b01, 32'b0,
-                   2'b10, pc
+                   2'b10, id_ex_pc
                }
            );
 
     wire [31:0]opr;
     ysyx_25020032_MuxKey #(3, 2, 32) op2 (
-               opr, alu_srcb, {
-                   2'b00, data_reg2,
-                   2'b01, ext_imm,
-                   2'b10, data_reg2 & 32'h0000001f
+               opr, id_ex_alu_srcb, {
+                   2'b00, id_ex_data_reg2,
+                   2'b01, id_ex_ext_imm,
+                   2'b10, id_ex_data_reg2 & 32'h0000001f
                }
            );
 
-    ysyx_25020032_Alu alu(.alu_ctrl(alu_ctrl), .a(opl), .b(opr), .result(alu_res));
-
-    // Calculate whether branch taken and target address
-
-    ysyx_25020032_MuxKey #(10, 4, 32) next_pc_mux(
-               branch_target, branch_type, {
-                   JAL,   pc+ext_imm,
-                   JALR,  (data_reg1 + ext_imm)&~1,
-                   BEQ,   pc+ext_imm,
-                   BNE,   pc+ext_imm,
-                   BLT,   pc+ext_imm,
-                   BGE,   pc+ext_imm,
-                   BLTU,  pc+ext_imm,
-                   BGEU,  pc+ext_imm,
-                   ECALL, mtvec,
-                   MRET,  mepc
-               }
-           );
-
-    ysyx_25020032_MuxKeyWithDefault #(10, 4, 1) branch_taken_mux(
-                          branch_taken, branch_type, 0, {
-                              BEQ,   alu_res == 0,
-                              BNE,   alu_res!= 0,
-                              BLT,   alu_res == 1,
-                              BGE,   alu_res!= 1,
-                              BLTU,  alu_res == 1,
-                              BGEU,  alu_res!= 1,
-                              JAL,   1'b1,
-                              JALR,  1'b1,
-                              ECALL, 1'b1,
-                              MRET,  1'b1
-                          }
-                      );
+    ysyx_25020032_Alu alu(.alu_ctrl(id_ex_alu_ctrl), .a(opl), .b(opr), .result(alu_res));
 
     // Calculate memory write signal
-    assign waddr = alu_res;
+    wire [31:0] waddr = alu_res;
     assign raddr = alu_res;
 
     // Generate wmask based on which part of the 4 bytes need to write
@@ -108,7 +120,7 @@ module ysyx_25020032_EXU(
     wire [3:0] sw_mask = 4'b1111;
 
     ysyx_25020032_MuxKey #(3, 3, 4) wmask_mux(
-               wmask, mem_width, {
+               wmask, id_ex_mem_width, {
                    3'b000, sb_mask,
                    3'b001, sh_mask,
                    3'b010, sw_mask
@@ -116,16 +128,16 @@ module ysyx_25020032_EXU(
            );
 
     wire [31:0]wbdata;
-    assign wbdata = wmask == 4'b0001 ? {24'd0,data_reg2[7:0]} :
-                    (wmask == 4'b0010 ? {16'd0, data_reg2[7:0], 8'd0} :
-                    (wmask == 4'b0100 ? {8'd0, data_reg2[7:0], 16'd0} :
-                    (wmask == 4'b1000 ? {data_reg2[7:0], 24'd0} : 32'h0)));
+    assign wbdata = wmask == 4'b0001 ? {24'd0,id_ex_data_reg2[7:0]} :
+                    (wmask == 4'b0010 ? {16'd0, id_ex_data_reg2[7:0], 8'd0} :
+                    (wmask == 4'b0100 ? {8'd0, id_ex_data_reg2[7:0], 16'd0} :
+                    (wmask == 4'b1000 ? {id_ex_data_reg2[7:0], 24'd0} : 32'h0)));
 
     ysyx_25020032_MuxKey #(3, 3, 32) wdata_mux(
-            wdata, mem_width, {
+            wdata, id_ex_mem_width, {
                 3'b000, wbdata,
-                3'b001, sh_mask == 4'b1100 ? {data_reg2[15:0], 16'd0} : {16'd0, data_reg2[15:0]},
-                3'b010, data_reg2
+                3'b001, sh_mask == 4'b1100 ? {id_ex_data_reg2[15:0], 16'd0} : {16'd0, id_ex_data_reg2[15:0]},
+                3'b010, id_ex_data_reg2
             }
         );
 

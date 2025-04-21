@@ -3,20 +3,15 @@ module ysyx_25020032_Icache(
     input clk,
     input rst,
 
-    input addr_valid,
-    output addr_ready,
-    output cache_valid,
-    input cache_ready,
-
+    // Icache->IFU synchronization
+    input icache_valid,
+    output icache_ready,
     input [31:0] pc,
     output [31:0] instr,
 
+    // Icache->AXI synchronization
     `AXI_MASTER_READ_ADDR_PORTS
 );
-    // Cache definition
-    reg [31:0] cache[0:15];
-    reg [25:0] tag[0:15];
-    reg valid[0:15];
 
 `ifdef CACHE_EVENT
     reg [31:0] miss_cnt;
@@ -28,6 +23,11 @@ module ysyx_25020032_Icache(
     end
 `endif
 
+    // Cache definition
+    reg [31:0] cache[0:15];
+    reg [25:0] tag[0:15];
+    reg valid[0:15];
+
     // If request, extract cache index/tag and check whether hit
     wire [3:0] cache_index = pc[5:2];
     wire [25:0] cache_tag = pc[31:6];
@@ -38,10 +38,7 @@ module ysyx_25020032_Icache(
     always@(*) begin araddr = pc; end
 
     // Handshake signal
-    wire request = addr_valid && addr_ready;
-    wire reply = cache_valid && cache_ready;
-    assign cache_valid = request && hit ? 1'b1 : 1'b0;
-    assign addr_ready = !rst && (state == IDLE);
+    assign icache_ready = icache_valid && hit ? 1'b1 : 1'b0;
 
 // ======================State Machine======================
     localparam IDLE = 2'd0,
@@ -62,8 +59,9 @@ module ysyx_25020032_Icache(
     always @(*) begin
         next_state = state;
         case (state)
+            // Stay at IDLE if no request or hit
             IDLE: begin
-                if(request && !hit) begin
+                if(icache_valid && !hit) begin
                     next_state = FETCH;
                 end
             end
@@ -95,14 +93,14 @@ module ysyx_25020032_Icache(
             arsize <= `AXI_DEFAULT_SIZE;
             arburst <= `AXI_DEFAULT_BURST;
 
-            // for(i = 0; i < 16; i = i + 1) begin
-            //     valid[i] <= 1'b0;
-            // end
+            for(integer i = 0; i < 16; i = i + 1) begin
+                valid[i] <= 1'b0;
+            end
         end
         else begin
             case (state)
                 IDLE: begin
-                    if(request && !hit) begin
+                    if(icache_valid && !hit) begin
                         arvalid <= 1'b1;
                         rready <= 1'b1;
 
