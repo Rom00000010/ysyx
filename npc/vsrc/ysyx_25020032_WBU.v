@@ -57,7 +57,7 @@ module ysyx_25020032_WBU(
     end
 
     always @(posedge clk) begin
-        if(state == IDLE && (rready && rvalid || bready && bvalid)) begin
+        if(rready && rvalid || bready && bvalid) begin
             extra_cnt <= extra_cnt + 1;
             finish_cnt <= finish_cnt + 1;
         end
@@ -271,37 +271,54 @@ module ysyx_25020032_WBU(
          (ex_wb_raddr[1:0] == 2'b10) ? rdata_latch[31:16] :
          16'b0;
 
-    ysyx_25020032_MuxKey #(5, 3, 32) mask_data_mux(
-                             mask_data, ex_wb_mem_width, {
-                                 3'b000, {{24{lb_data[7]}}, lb_data},
-                                 3'b001, {{16{lh_data[15]}}, lh_data},
-                                 3'b010, rdata_latch,
-                                 3'b100, {{24{1'b0}}, lb_data},
-                                 3'b101, {{16{1'b0}}, lh_data}
-                             }
-                         );
+    // ysyx_25020032_MuxKey #(5, 3, 32) mask_data_mux(
+    //                          mask_data, ex_wb_mem_width, {
+    //                              3'b000, {{24{lb_data[7]}}, lb_data},
+    //                              3'b001, {{16{lh_data[15]}}, lh_data},
+    //                              3'b010, rdata_latch,
+    //                              3'b100, {{24{1'b0}}, lb_data},
+    //                              3'b101, {{16{1'b0}}, lh_data}
+    //                          }
+    //                      );
+
+    assign mask_data = {32{ex_wb_mem_width == 3'b000}} & {{24{lb_data[7]}}, lb_data} |
+                       {32{ex_wb_mem_width == 3'b001}} & {{16{lh_data[15]}}, lh_data} |
+                       {32{ex_wb_mem_width == 3'b010}} & rdata_latch |
+                       {32{ex_wb_mem_width == 3'b100}} & {{24{1'b0}}, lb_data} |
+                       {32{ex_wb_mem_width == 3'b101}} & {{16{1'b0}}, lh_data};
 
     wire [2:0] size;
-    ysyx_25020032_MuxKey #(5, 3, 3) size_mux(
-                             size, ex_wb_mem_width, {
-                                 3'b000, 3'b000,
-                                 3'b001, 3'b001,
-                                 3'b010, 3'b010,
-                                 3'b100, 3'b000,
-                                 3'b101, 3'b001
-                             }
-                         );
+    // ysyx_25020032_MuxKey #(5, 3, 3) size_mux(
+    //                          size, ex_wb_mem_width, {
+    //                              3'b000, 3'b000,
+    //                              3'b001, 3'b001,
+    //                              3'b010, 3'b010,
+    //                              3'b100, 3'b000,
+    //                              3'b101, 3'b001
+    //                          }
+    //                      );
+
+    assign size = {3{ex_wb_mem_width == 3'b000}} & 3'b000 |
+                  {3{ex_wb_mem_width == 3'b001}} & 3'b001 |
+                  {3{ex_wb_mem_width == 3'b010}} & 3'b010 |
+                  {3{ex_wb_mem_width == 3'b100}} & 3'b000 |
+                  {3{ex_wb_mem_width == 3'b101}} & 3'b001;
 
     // ==================================================================================
 
-    ysyx_25020032_MuxKey #(4, 2, 32) wdata_regd_mux(
-                             wdata_regd, ex_wb_wb_sel, {
-                                 2'b00, ex_wb_alu_res,
-                                 2'b01, ex_wb_pc+4,
-                                 2'b10, ex_wb_csr_out,
-                                 2'b11, mask_data
-                             }
-                         );
+    // ysyx_25020032_MuxKey #(4, 2, 32) wdata_regd_mux(
+    //                          wdata_regd, ex_wb_wb_sel, {
+    //                              2'b00, ex_wb_alu_res,
+    //                              2'b01, ex_wb_pc+4,
+    //                              2'b10, ex_wb_csr_out,
+    //                              2'b11, mask_data
+    //                          }
+    //                      );
+
+    assign wdata_regd = {32{ex_wb_wb_sel == 2'b00}} & ex_wb_alu_res |
+                        {32{ex_wb_wb_sel == 2'b01}} & ex_wb_pc+4 |
+                        {32{ex_wb_wb_sel == 2'b10}} & ex_wb_csr_out |
+                        {32{ex_wb_wb_sel == 2'b11}} & mask_data;
 
     assign csr_in = ex_wb_csr_write_set ? ex_wb_data_reg1 | ex_wb_csr_out : ex_wb_data_reg1;
 
@@ -309,35 +326,57 @@ module ysyx_25020032_WBU(
 
     // Calculate whether branch taken and target address
 
-    ysyx_25020032_MuxKey #(10, 4, 32) next_pc_mux(
-               branch_target, ex_wb_branch_type, {
-                   JAL,   ex_wb_pc+ex_wb_ext_imm,
-                   JALR,  (ex_wb_data_reg1 + ex_wb_ext_imm)&~1,
-                   BEQ,   ex_wb_pc+ex_wb_ext_imm,
-                   BNE,   ex_wb_pc+ex_wb_ext_imm,
-                   BLT,   ex_wb_pc+ex_wb_ext_imm,
-                   BGE,   ex_wb_pc+ex_wb_ext_imm,
-                   BLTU,  ex_wb_pc+ex_wb_ext_imm,
-                   BGEU,  ex_wb_pc+ex_wb_ext_imm,
-                   ECALL, ex_wb_mtvec,
-                   MRET,  ex_wb_mepc
-               }
-           );
+    // ysyx_25020032_MuxKey #(10, 4, 32) next_pc_mux(
+    //            branch_target, ex_wb_branch_type, {
+    //                JAL,   ex_wb_pc+ex_wb_ext_imm,
+    //                JALR,  (ex_wb_data_reg1 + ex_wb_ext_imm)&~1,
+    //                BEQ,   ex_wb_pc+ex_wb_ext_imm,
+    //                BNE,   ex_wb_pc+ex_wb_ext_imm,
+    //                BLT,   ex_wb_pc+ex_wb_ext_imm,
+    //                BGE,   ex_wb_pc+ex_wb_ext_imm,
+    //                BLTU,  ex_wb_pc+ex_wb_ext_imm,
+    //                BGEU,  ex_wb_pc+ex_wb_ext_imm,
+    //                ECALL, ex_wb_mtvec,
+    //                MRET,  ex_wb_mepc
+    //            }
+    //        );
 
-    ysyx_25020032_MuxKeyWithDefault #(10, 4, 1) branch_taken_mux(
-                          branch_taken, ex_wb_branch_type, 0, {
-                              BEQ,   ex_wb_alu_res == 0,
-                              BNE,   ex_wb_alu_res!= 0,
-                              BLT,   ex_wb_alu_res == 1,
-                              BGE,   ex_wb_alu_res!= 1,
-                              BLTU,  ex_wb_alu_res == 1,
-                              BGEU,  ex_wb_alu_res!= 1,
-                              JAL,   1'b1,
-                              JALR,  1'b1,
-                              ECALL, 1'b1,
-                              MRET,  1'b1
-                          }
-                      );
+    assign branch_target = {32{ex_wb_branch_type == JAL}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == JALR}} & (ex_wb_data_reg1 + ex_wb_ext_imm)&~1 |
+                           {32{ex_wb_branch_type == BEQ}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == BNE}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == BLT}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == BGE}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == BLTU}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == BGEU}} & ex_wb_pc+ex_wb_ext_imm |
+                           {32{ex_wb_branch_type == ECALL}} & ex_wb_mtvec |
+                           {32{ex_wb_branch_type == MRET}} & ex_wb_mepc;
+
+    // ysyx_25020032_MuxKeyWithDefault #(10, 4, 1) branch_taken_mux(
+    //                       branch_taken, ex_wb_branch_type, 0, {
+    //                           BEQ,   ex_wb_alu_res == 0,
+    //                           BNE,   ex_wb_alu_res!= 0,
+    //                           BLT,   ex_wb_alu_res == 1,
+    //                           BGE,   ex_wb_alu_res!= 1,
+    //                           BLTU,  ex_wb_alu_res == 1,
+    //                           BGEU,  ex_wb_alu_res!= 1,
+    //                           JAL,   1'b1,
+    //                           JALR,  1'b1,
+    //                           ECALL, 1'b1,
+    //                           MRET,  1'b1
+    //                       }
+    //                   );
+
+    assign branch_taken = {1{ex_wb_branch_type == BEQ}} & (ex_wb_alu_res == 0) |
+                         {1{ex_wb_branch_type == BNE}} & (ex_wb_alu_res != 0) |
+                         {1{ex_wb_branch_type == BLT}} & (ex_wb_alu_res == 1) |
+                         {1{ex_wb_branch_type == BGE}} & (ex_wb_alu_res != 1) |
+                         {1{ex_wb_branch_type == BLTU}} & (ex_wb_alu_res == 1) |
+                         {1{ex_wb_branch_type == BGEU}} & (ex_wb_alu_res != 1) |
+                         {1{ex_wb_branch_type == JAL}} & 1'b1 |
+                         {1{ex_wb_branch_type == JALR}} & 1'b1 |
+                         {1{ex_wb_branch_type == ECALL}} & 1'b1 |
+                         {1{ex_wb_branch_type == MRET}} & 1'b1;
 
 `ifndef SYNTHESIS   
     function automatic int wbu_skip();

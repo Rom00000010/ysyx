@@ -1,4 +1,5 @@
 /* verilator lint_off UNUSEDSIGNAL */
+`include "common.vh"
 module ysyx_25020032_EXU(
         input clk,
         input rst,
@@ -88,22 +89,30 @@ module ysyx_25020032_EXU(
     end
 
     wire [31:0]opl;
-    ysyx_25020032_MuxKey #(3, 2, 32) op1 (
-               opl, id_ex_alu_srca,{
-                   2'b00, id_ex_data_reg1,
-                   2'b01, 32'b0,
-                   2'b10, id_ex_pc
-               }
-           );
+    // ysyx_25020032_MuxKey #(3, 2, 32) op1 (
+    //            opl, id_ex_alu_srca,{
+    //                2'b00, id_ex_data_reg1,
+    //                2'b01, 32'b0,
+    //                2'b10, id_ex_pc
+    //            }
+    //        );
+
+    assign opl = {32{(id_ex_alu_srca == 2'b00)}} & id_ex_data_reg1 |
+                 {32{(id_ex_alu_srca == 2'b01)}} & 32'b0 |
+                 {32{(id_ex_alu_srca == 2'b10)}} & id_ex_pc;
 
     wire [31:0]opr;
-    ysyx_25020032_MuxKey #(3, 2, 32) op2 (
-               opr, id_ex_alu_srcb, {
-                   2'b00, id_ex_data_reg2,
-                   2'b01, id_ex_ext_imm,
-                   2'b10, id_ex_data_reg2 & 32'h0000001f
-               }
-           );
+    // ysyx_25020032_MuxKey #(3, 2, 32) op2 (
+    //            opr, id_ex_alu_srcb, {
+    //                2'b00, id_ex_data_reg2,
+    //                2'b01, id_ex_ext_imm,
+    //                2'b10, id_ex_data_reg2 & 32'h0000001f
+    //            }
+    //        );
+
+    assign opr = {32{(id_ex_alu_srcb == 2'b00)}} & id_ex_data_reg2 |
+                     {32{(id_ex_alu_srcb == 2'b01)}} & id_ex_ext_imm |
+                     {32{(id_ex_alu_srcb == 2'b10)}} & (id_ex_data_reg2 & 32'h0000001f);
 
     ysyx_25020032_Alu alu(.alu_ctrl(id_ex_alu_ctrl), .a(opl), .b(opr), .result(alu_res));
 
@@ -113,34 +122,50 @@ module ysyx_25020032_EXU(
 
     // Generate wmask based on which part of the 4 bytes need to write
     wire [3:0] sb_mask = (4'b0001 << waddr[1:0]);
-    wire [3:0] sh_mask = (waddr[1:0] == 2'b00) ? 4'b0011 :
-         (waddr[1:0] == 2'b10) ? 4'b1100 :
-         4'b0000;
+    // wire [3:0] sh_mask = (waddr[1:0] == 2'b00) ? 4'b0011 :
+    //      (waddr[1:0] == 2'b10) ? 4'b1100 :
+    //      4'b0000;
+
+    wire [3:0] sh_mask = {4{waddr[1:0] == 2'b00}} & 4'b0011 |
+                         {4{waddr[1:0] == 2'b10}} & 4'b1100 |
+                         4'b0000;
 
     wire [3:0] sw_mask = 4'b1111;
 
-    ysyx_25020032_MuxKey #(3, 3, 4) wmask_mux(
-               wmask, id_ex_mem_width, {
-                   3'b000, sb_mask,
-                   3'b001, sh_mask,
-                   3'b010, sw_mask
-               }
-           );
+    // ysyx_25020032_MuxKey #(3, 3, 4) wmask_mux(
+    //            wmask, id_ex_mem_width, {
+    //                3'b000, sb_mask,
+    //                3'b001, sh_mask,
+    //                3'b010, sw_mask
+    //            }
+    //        );
+
+    assign wmask = {4{id_ex_mem_width == 3'b000}} & sb_mask |
+                   {4{id_ex_mem_width == 3'b001}} & sh_mask |
+                   {4{id_ex_mem_width == 3'b010}} & sw_mask;
 
     wire [31:0]wbdata;
-    assign wbdata = wmask == 4'b0001 ? {24'd0,id_ex_data_reg2[7:0]} :
-                    (wmask == 4'b0010 ? {16'd0, id_ex_data_reg2[7:0], 8'd0} :
-                    (wmask == 4'b0100 ? {8'd0, id_ex_data_reg2[7:0], 16'd0} :
-                    (wmask == 4'b1000 ? {id_ex_data_reg2[7:0], 24'd0} : 32'h0)));
+    // assign wbdata = wmask == 4'b0001 ? {24'd0,id_ex_data_reg2[7:0]} :
+    //                 (wmask == 4'b0010 ? {16'd0, id_ex_data_reg2[7:0], 8'd0} :
+    //                 (wmask == 4'b0100 ? {8'd0, id_ex_data_reg2[7:0], 16'd0} :
+    //                 (wmask == 4'b1000 ? {id_ex_data_reg2[7:0], 24'd0} : 32'h0)));
 
-    ysyx_25020032_MuxKey #(3, 3, 32) wdata_mux(
-            wdata, id_ex_mem_width, {
-                3'b000, wbdata,
-                3'b001, sh_mask == 4'b1100 ? {id_ex_data_reg2[15:0], 16'd0} : {16'd0, id_ex_data_reg2[15:0]},
-                3'b010, id_ex_data_reg2
-            }
-        );
+    assign wbdata = {32{wmask == 4'b0001}} & {24'd0,id_ex_data_reg2[7:0]} |
+                    {32{wmask == 4'b0010}} & {16'd0, id_ex_data_reg2[7:0], 8'd0} |
+                    {32{wmask == 4'b0100}} & {8'd0, id_ex_data_reg2[7:0], 16'd0} |
+                    {32{wmask == 4'b1000}} & {id_ex_data_reg2[7:0], 24'd0};
 
+    // ysyx_25020032_MuxKey #(3, 3, 32) wdata_mux(
+    //         wdata, id_ex_mem_width, {
+    //             3'b000, wbdata,
+    //             3'b001, sh_mask == 4'b1100 ? {id_ex_data_reg2[15:0], 16'd0} : {16'd0, id_ex_data_reg2[15:0]},
+    //             3'b010, id_ex_data_reg2
+    //         }
+    //     );
+
+    assign wdata = {32{id_ex_mem_width == 3'b000}} & wbdata |
+                   {32{id_ex_mem_width == 3'b001}} & (sh_mask == 4'b1100 ? {id_ex_data_reg2[15:0], 16'd0} : {16'd0, id_ex_data_reg2[15:0]}) |
+                   {32{id_ex_mem_width == 3'b010}} & id_ex_data_reg2;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */
