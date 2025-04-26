@@ -29,8 +29,11 @@ module ysyx_25020032_Alu(
                     {32{alu_ctrl == LESS}} & {31'b0, ($signed(a) < $signed(b))} |
                     {32{alu_ctrl == LESSU}} & {31'b0, a < b} |
                     {32{alu_ctrl == SLL}} & (a << b[4:0]) |
-                    {32{alu_ctrl == SRL}} & (a>>b[4:0]) |
-                    {32{alu_ctrl == SRA}} & ($signed(a)>>>b[4:0]);
+                    {32{alu_ctrl == SRL}} & (a >> b[4:0]) |
+                    {32{alu_ctrl == SRA}} & sra_res;
+
+    wire signed [31:0] sra_res;
+    assign sra_res = $signed(a) >>> $signed(b[4:0]);
 
     // wire [31:0] add_r  = a + b;
     // wire [31:0] sub_r  = a - b;

@@ -16,6 +16,8 @@ module ysyx_25020032_WBU(
         input valid,
         input [1:0]wb_sel,
         input csr_write_set,
+        input csr_wen,
+        input reg_write,
 
         input [31:0]ext_imm,
         input [31:0]data_reg1,
@@ -35,6 +37,8 @@ module ysyx_25020032_WBU(
 
         output [31:0]wdata_regd,
         output [31:0]csr_in,
+        output reg ex_wb_csr_wen,
+        output reg ex_wb_reg_write,
 
         output access_fault,
         output [31:0]branch_target,
@@ -64,26 +68,26 @@ module ysyx_25020032_WBU(
         else if(state != IDLE)
             extra_cnt <= extra_cnt + 1;
     end
+
+    // For Difftest
+    wire sram_access = ex_wb_raddr >= 32'h0f000000 && ex_wb_raddr < 32'h0f000000 + 32'h00002000;
+    wire sdram_access = ex_wb_raddr >= 32'ha0000000 && ex_wb_raddr < 32'hbfffffff;
 `endif
 
     reg [3:0] ex_wb_branch_type;
     reg [2:0] ex_wb_mem_width;
-    reg ex_wb_mem_wen;
-    reg ex_wb_valid;
     reg [1:0] ex_wb_wb_sel;
     reg ex_wb_csr_write_set;
-
+    
     reg [31:0] ex_wb_ext_imm;
     reg [31:0] ex_wb_data_reg1;
     reg [31:0] ex_wb_csr_out;
     reg [31:0] ex_wb_mepc;
     reg [31:0] ex_wb_mtvec;
     reg [31:0] ex_wb_pc;
+    reg [31:0] ex_wb_raddr;
 
     reg [31:0] ex_wb_alu_res;
-    reg [31:0] ex_wb_raddr;
-    reg [3:0] ex_wb_wmask;
-    reg [31:0] ex_wb_wrdata;
 
     always @(posedge clk) begin
         if(rst) begin
@@ -97,10 +101,10 @@ module ysyx_25020032_WBU(
 
                 ex_wb_branch_type <= branch_type;
                 ex_wb_mem_width <= mem_width;
-                ex_wb_mem_wen <= mem_wen;
-                ex_wb_valid <= valid;
                 ex_wb_wb_sel <= wb_sel;
                 ex_wb_csr_write_set <= csr_write_set;
+                ex_wb_csr_wen <= csr_wen;
+                ex_wb_reg_write <= reg_write;
 
                 ex_wb_ext_imm <= ext_imm;
                 ex_wb_data_reg1 <= data_reg1;
@@ -110,14 +114,12 @@ module ysyx_25020032_WBU(
                 ex_wb_pc <= pc;
 
                 ex_wb_alu_res <= alu_res;
+
                 ex_wb_raddr <= raddr;
-                ex_wb_wmask <= wmask;
-                ex_wb_wrdata <= wrdata;
 
             end else if (rready && rvalid || bready && bvalid) begin
                 wbu_valid <= 1'b1;
-                ex_wb_valid <= 1'b0;
-            end else begin
+                end else begin
                 wbu_valid <= 1'b0;
             end     
         end
@@ -164,15 +166,21 @@ module ysyx_25020032_WBU(
                 next_state = state;
             end
         endcase
-
     end
 
     reg [1:0]rresp_latch;
     reg [1:0]bresp_latch;
 
-    // For Difftest
-    wire sram_access = ex_wb_raddr >= 32'h0f000000 && ex_wb_raddr < 32'h0f000000 + 32'h00002000;
-    wire sdram_access = ex_wb_raddr >= 32'ha0000000 && ex_wb_raddr < 32'hbfffffff;
+    always @* begin
+        arid = `AXI_DEFAULT_ID;
+        arlen = `AXI_DEFAULT_LEN;
+        arburst = `AXI_DEFAULT_BURST;
+        awid = `AXI_DEFAULT_ID;
+        awlen = `AXI_DEFAULT_LEN;
+        awburst = `AXI_DEFAULT_BURST;
+        wlast = 1'b1;  // Single transfer
+    end
+
     // Output logic
     always @(posedge clk or posedge rst) begin
         if(rst) begin
@@ -182,15 +190,8 @@ module ysyx_25020032_WBU(
             awvalid <= 1'b0;
             wvalid <= 1'b0;
             // Set default values for AXI signals
-            arid <= `AXI_DEFAULT_ID;
-            arlen <= `AXI_DEFAULT_LEN;
             arsize <= `AXI_DEFAULT_SIZE;
-            arburst <= `AXI_DEFAULT_BURST;
-            awid <= `AXI_DEFAULT_ID;
-            awlen <= `AXI_DEFAULT_LEN;
             awsize <= `AXI_DEFAULT_SIZE;
-            awburst <= `AXI_DEFAULT_BURST;
-            wlast <= 1'b1;  // Single transfer
         end
         else begin
             case (state)
@@ -203,18 +204,18 @@ module ysyx_25020032_WBU(
                         wvalid <= 1'b0;
                     end
                     // Actually equal with IFU fetch state logic
-                    else if(ex_wb_valid && !ex_wb_mem_wen) begin
+                    else if(exu_valid && valid && !mem_wen) begin
                         arvalid <= 1'b1;
-                        araddr <= ex_wb_raddr;
+                        araddr <= raddr;
                         rready <= 1'b1;
                         arsize <= size;
                     end
-                    else if(ex_wb_valid && ex_wb_mem_wen) begin
+                    else if(exu_valid && valid && mem_wen) begin
                         awvalid <= 1'b1;
-                        awaddr <= ex_wb_raddr;
+                        awaddr <= raddr;
                         wvalid <= 1'b1;
-                        wdata <= ex_wb_wrdata;
-                        wstrb <= ex_wb_wmask[3:0];  // Convert 8-bit to 4-bit
+                        wdata <= wrdata;
+                        wstrb <= wmask[3:0];  // Convert 8-bit to 4-bit
                         bready <= 1'b1;
                         awsize <= size;
                     end
@@ -262,13 +263,13 @@ module ysyx_25020032_WBU(
     // Memory read, Extract data from 4 bytes based on address
     wire [31:0] mask_data;
 
-    wire [7:0] lb_data = (ex_wb_raddr[1:0] == 2'b00) ? rdata_latch[7:0]  :
-         (ex_wb_raddr[1:0] == 2'b01) ? rdata_latch[15:8] :
-         (ex_wb_raddr[1:0] == 2'b10) ? rdata_latch[23:16] :
-         rdata_latch[31:24];
+    wire [7:0] lb_data = {8{(ex_wb_raddr[1:0] == 2'b00)}} & rdata_latch[7:0] |
+         {8{(ex_wb_raddr[1:0] == 2'b01)}} & rdata_latch[15:8] |
+         {8{(ex_wb_raddr[1:0] == 2'b10)}} & rdata_latch[23:16] |
+         {8{(ex_wb_raddr[1:0] == 2'b11)}} & rdata_latch[31:24];
 
-    wire [15:0] lh_data = (ex_wb_raddr[1:0] == 2'b00) ? rdata_latch[15:0] :
-         (ex_wb_raddr[1:0] == 2'b10) ? rdata_latch[31:16] :
+    wire [15:0] lh_data = {16{(ex_wb_raddr[1:0] == 2'b00)}} & rdata_latch[15:0] |
+         {16{(ex_wb_raddr[1:0] == 2'b10)}} & rdata_latch[31:16] |
          16'b0;
 
     // ysyx_25020032_MuxKey #(5, 3, 32) mask_data_mux(

@@ -80,23 +80,7 @@ module ysyx_25020032_Xbar (
         input [1:0] clint_rresp,
         input clint_rlast,
         input clint_rvalid,
-        output reg clint_rready,
-        output reg [3:0] clint_awid,
-        output reg [31:0] clint_awaddr,
-        output reg [7:0] clint_awlen,
-        output reg [2:0] clint_awsize,
-        output reg [1:0] clint_awburst,
-        output reg clint_awvalid,
-        input clint_awready,
-        output reg [31:0] clint_wdata,
-        output reg [3:0] clint_wstrb,
-        output reg clint_wlast,
-        output reg clint_wvalid,
-        input clint_wready,
-        input [3:0] clint_bid,
-        input [1:0] clint_bresp,
-        input clint_bvalid,
-        output reg clint_bready
+        output reg clint_rready
     );
 
     // Address decoding - only based on address values
@@ -105,27 +89,6 @@ module ysyx_25020032_Xbar (
 
     // Read channel routings
     always @(*) begin
-        clint_arvalid = 0;
-        soc_arvalid = 0;
-        clint_araddr = 0;
-        soc_araddr = 0;
-        clint_arid = 0;
-        soc_arid = 0;
-        clint_arlen = 0;
-        soc_arlen = 0;
-        clint_arsize = 0;
-        soc_arsize = 0;
-        clint_arburst = 0;
-        soc_arburst = 0;
-        s_arready = 0;
-        s_rvalid = 0;
-        s_rdata = 0;
-        s_rresp = 0;
-        s_rid = 0;
-        s_rlast = 0;
-        clint_rready = 0;
-        soc_rready = 0;
-
         if (is_clint_addr) begin
             clint_araddr = s_araddr;
             clint_arid = s_arid;
@@ -140,8 +103,16 @@ module ysyx_25020032_Xbar (
             s_rid = clint_rid;
             s_rlast = clint_rlast;
             clint_rready = s_rready;
+
+            soc_araddr = 32'h0;
+            soc_arid = 4'h0;
+            soc_arlen = 8'h0;
+            soc_arsize = 3'h0;
+            soc_arburst = 2'h0;
+            soc_arvalid = 1'h0;
+            soc_rready = 1'h0;
         end
-        else if (is_soc_addr) begin
+        else begin
             soc_araddr = s_araddr;
             soc_arid = s_arid;
             soc_arlen = s_arlen;
@@ -155,75 +126,35 @@ module ysyx_25020032_Xbar (
             s_rid = soc_rid;
             s_rlast = soc_rlast;
             soc_rready = s_rready;
+
+            clint_araddr = 32'h0;
+            clint_arid = 4'h0;
+            clint_arlen = 8'h0;
+            clint_arsize = 3'h0;
+            clint_arburst = 2'h0;
+            clint_arvalid = 1'h0;
+            clint_rready = 1'h0;
         end
     end
 
     // Write channel routing
     always @(*) begin
-        clint_awvalid = 0;
-        soc_awvalid = 0;
-        clint_awaddr = 0;
-        soc_awaddr = 0;
-        clint_awid = 0;
-        soc_awid = 0;
-        clint_awlen = 0;
-        soc_awlen = 0;
-        clint_awsize = 0;
-        soc_awsize = 0;
-        clint_awburst = 0;
-        soc_awburst = 0;
-        s_awready = 0;
-        clint_wvalid = 0;
-        soc_wvalid = 0;
-        s_wready = 0;
-        s_bvalid = 0;
-        s_bresp = 0;
-        s_bid = 0;
-        clint_bready = 0;
-        soc_bready = 0;
-        clint_wdata = 0;
-        soc_wdata = 0;
-        clint_wstrb = 0;
-        soc_wstrb = 0;
-        clint_wlast = 0;
-        soc_wlast = 0;
-
-        if (is_clint_addr) begin
-            clint_awaddr = s_awaddr;
-            clint_awid = s_awid;
-            clint_awlen = s_awlen;
-            clint_awsize = s_awsize;
-            clint_awburst = s_awburst;
-            clint_awvalid = s_awvalid;
-            s_awready = clint_awready;
-            clint_wdata = s_wdata;
-            clint_wstrb = s_wstrb[3:0];  // CLINT only uses lower 4 bits
-            clint_wlast = s_wlast;
-            clint_wvalid = s_wvalid;
-            s_wready = clint_wready;
-            s_bvalid = clint_bvalid;
-            s_bresp = clint_bresp;
-            s_bid = clint_bid;
-            clint_bready = s_bready;
-        end
-        else if (is_soc_addr) begin
-            soc_awaddr = s_awaddr;
-            soc_awid = s_awid;
-            soc_awlen = s_awlen;
-            soc_awsize = s_awsize;
-            soc_awburst = s_awburst;
-            soc_awvalid = s_awvalid;
-            s_awready = soc_awready;
-            soc_wdata = s_wdata;
-            soc_wstrb = s_wstrb;
-            soc_wlast = s_wlast;
-            soc_wvalid = s_wvalid;
-            s_wready = soc_wready;
-            s_bvalid = soc_bvalid;
-            s_bresp = soc_bresp;
-            s_bid = soc_bid;
-            soc_bready = s_bready;
-        end
+        soc_awaddr = s_awaddr;
+        soc_awid = s_awid;
+        soc_awlen = s_awlen;
+        soc_awsize = s_awsize;
+        soc_awburst = s_awburst;
+        soc_awvalid = s_awvalid;
+        s_awready = soc_awready;
+        soc_wdata = s_wdata;
+        soc_wstrb = s_wstrb;
+        soc_wlast = s_wlast;
+        soc_wvalid = s_wvalid;
+        s_wready = soc_wready;
+        s_bvalid = soc_bvalid;
+        s_bresp = soc_bresp;
+        s_bid = soc_bid;
+        soc_bready = s_bready;
     end
 
 endmodule

@@ -20,26 +20,7 @@ module ysyx_25020032_Clint (
     output reg [1:0] rresp,
     output reg rlast,
     output reg rvalid,
-    input rready,
-    // Write address channel
-    input [3:0] awid,
-    input [31:0] awaddr,
-    input [7:0] awlen,
-    input [2:0] awsize,
-    input [1:0] awburst,
-    input awvalid,
-    output reg awready,
-    // Write data channel
-    input [31:0] wdata,
-    input [3:0] wstrb,
-    input wlast,
-    input wvalid,
-    output reg wready,
-    // Write response channel
-    output reg [3:0] bid,
-    output reg [1:0] bresp,
-    output reg bvalid,
-    input bready
+    input rready
 );
 
     // 64-bit mtime counter
@@ -77,7 +58,7 @@ module ysyx_25020032_Clint (
                 IDLE: begin
                     if (arvalid && arready) begin
                         // Decode address and prepare response
-                        case (araddr)
+                        unique case (araddr)
                             32'h02000000: rdata <= mtime[31:0];   // Lower 32 bits
                             32'h02000004: rdata <= mtime[63:32];  // Upper 32 bits
                             default: rdata <= 32'b0;              // Invalid address
@@ -99,30 +80,5 @@ module ysyx_25020032_Clint (
             endcase
         end
     end
-
-    // Write interface (always return error since mtime is read-only)
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            awready <= 1'b1;
-            wready <= 1'b1;
-            bvalid <= 1'b0;
-            bresp <= 2'b00;
-            bid <= 4'b0;
-        end else begin
-            if (awvalid && wvalid && awready && wready) begin
-                // Write attempt - return error
-                bvalid <= 1'b1;
-                bid <= awid;
-                bresp <= 2'b10;  // SLVERR for write attempt to read-only register
-                awready <= 1'b0;
-                wready <= 1'b0;
-            end else if (bvalid && bready) begin
-                bvalid <= 1'b0;
-                awready <= 1'b1;
-                wready <= 1'b1;
-            end
-        end
-    end
-
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */ 

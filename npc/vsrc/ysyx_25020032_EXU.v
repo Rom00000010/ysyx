@@ -17,13 +17,14 @@ module ysyx_25020032_EXU(
         input valid,
         input [1:0]wb_sel,
         input csr_write_set,
+        input id_csr_wen,
+        input ecall,
+        input [31:0] mcause,
+        input reg_write,
 
         input [31:0]ext_imm,
         input [31:0]data_reg1,
         input [31:0]data_reg2,
-        input [31:0]csr_out,
-        input [31:0]mepc,
-        input [31:0]mtvec,
         input [31:0]pc,
 
         // EXU->WBU synchronization
@@ -36,24 +37,32 @@ module ysyx_25020032_EXU(
         output reg id_ex_valid,
         output reg [1:0] id_ex_wb_sel,
         output reg id_ex_csr_write_set,
+        output reg id_ex_csr_wen,
+        output reg id_ex_reg_write,
 
         output reg [31:0] id_ex_ext_imm,
         output reg [31:0] id_ex_data_reg1,
-        output reg [31:0] id_ex_csr_out,
-        output reg [31:0] id_ex_mepc,
-        output reg [31:0] id_ex_mtvec,
+        output [31:0] id_ex_csr_out,
+        output [31:0] id_ex_mepc,
+        output [31:0] id_ex_mtvec,
         output reg [31:0] id_ex_pc,
 
         output wire [31:0]alu_res,
         output [31:0]raddr,
         output [31:0]wdata,
-        output [3:0]wmask
+        output [3:0]wmask,
+
+        input wbu_valid,
+        input [31:0]csr_in,
+        input csr_wen
     );
 
     reg [3:0] id_ex_alu_ctrl;
     reg [1:0] id_ex_alu_srca;
     reg [1:0] id_ex_alu_srcb;
     reg [31:0] id_ex_data_reg2;
+    reg id_ex_ecall;
+    reg [31:0] id_ex_mcause;
 
     always @(posedge clk) begin
         if(rst) begin
@@ -73,13 +82,15 @@ module ysyx_25020032_EXU(
                 id_ex_valid <= valid;
                 id_ex_wb_sel <= wb_sel;
                 id_ex_csr_write_set <= csr_write_set;
+                id_ex_csr_wen <= id_csr_wen;
+                id_ex_ecall <= ecall;
+                id_ex_mcause <= mcause;
+                id_ex_reg_write <= reg_write;
 
                 id_ex_ext_imm <= ext_imm;
                 id_ex_data_reg1 <= data_reg1;
                 id_ex_data_reg2 <= data_reg2;
-                id_ex_csr_out <= csr_out;
-                id_ex_mepc <= mepc;
-                id_ex_mtvec <= mtvec;
+
                 id_ex_pc <= pc;
             end
             else begin
@@ -87,6 +98,17 @@ module ysyx_25020032_EXU(
             end
         end
     end
+    // =========================================================
+
+    ysyx_25020032_Csr csr (
+        .clk(clk), .rst(rst),
+        .addr(id_ex_ext_imm[11:0]), .csr_out(id_ex_csr_out), 
+        .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid && exu_ready),
+        .exception(id_ex_ecall), .exception_pc(id_ex_pc), .exception_cause(id_ex_mcause),
+        .mtvec(id_ex_mtvec), .mepc(id_ex_mepc)
+    );
+
+    // =========================================================
 
     wire [31:0]opl;
     // ysyx_25020032_MuxKey #(3, 2, 32) op1 (

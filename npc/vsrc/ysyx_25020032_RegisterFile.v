@@ -9,20 +9,19 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
         output[DATA_WIDTH-1:0] rdata2,
         input wen
     );
-    reg [DATA_WIDTH-1:0] rf [2**ADDR_WIDTH-1:0];
+    reg [DATA_WIDTH-1:0] rf [2**ADDR_WIDTH-2:0];
 
     always @(posedge clk) begin
         if (write_enable) begin
-            rf[waddr] <= wdata;
+            rf[waddr-1] <= wdata;
         end
     end
 
     // $0 always keep zero
     wire write_enable = wen & (waddr != 0);
 
-    wire [31:0]zero_reg=32'h00000000;
-    assign rdata1 = raddr1 == 0 ? zero_reg : rf[raddr1];
-    assign rdata2 = raddr2 == 0 ? zero_reg : rf[raddr2];
+    assign rdata1 = {32{raddr1 != 0}} & rf[raddr1-1];
+    assign rdata2 = {32{raddr2 != 0}} & rf[raddr2-1];
 
 `ifndef SYNTHESIS
     // for sdb info register
@@ -75,7 +74,12 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
         begin
             $display("=== Register (RV32E) Contents ===");
             for (i = 0; i < (2**ADDR_WIDTH); i = i + 1) begin
-                $display("%s = 0x%08h %d", get_abi_name(i[3:0]), rf[i], rf[i]);
+                if(i == 0) begin
+                    $display("%s = 0x%08h %d", get_abi_name(i[3:0]), 0, 0);
+                end
+                else begin
+                    $display("%s = 0x%08h %d", get_abi_name(i[3:0]), rf[i-1], rf[i-1]);
+                end
             end
             $display("=====================================");
         end
@@ -114,7 +118,12 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
             end
             else begin
                 // x0 恒为 0，也可直接返回 rf[idx]，因为我们从不写入 rf[0]
-                get_reg_val_by_abi = rf[idx];
+                if (idx == 0) begin
+                    get_reg_val_by_abi = 0;
+                end
+                else begin
+                    get_reg_val_by_abi = rf[idx-1];
+                end
             end
         end
     endfunction

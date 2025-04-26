@@ -26,19 +26,20 @@ module ysyx_25020032_IDU(
         output valid,
         output [1:0]wb_sel,
         output csr_write_set,
+        output csr_wen,
+        output ecall,
+        output [31:0] mcause,
+        output reg_write,
 
         // Datapath
         output [31:0]ext_imm,
         output [31:0]data_reg1,
         output [31:0]data_reg2,
-        output [31:0]csr_out,
-        output [31:0]mepc,
-        output [31:0]mtvec,
 
         // WBU->IDU synchronization
         input wbu_valid,
         input [31:0]wdata_regd,
-        input [31:0]csr_in
+        input ex_wb_reg_write
     );
 
 `ifdef DECODE_EVENT
@@ -109,7 +110,7 @@ module ysyx_25020032_IDU(
     // Special signal for load, store, ecall or mret
     assign valid = ((opcode == 7'b0000011) || (opcode == 7'b0100011));
     assign mem_width = func3;
-    wire ecall = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h000;
+    assign ecall = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h000;
     wire mret  = opcode == 7'b1110011 && func3 == 3'b0 && func12 == 12'h302;
 
     // Extend immediate
@@ -127,20 +128,12 @@ module ysyx_25020032_IDU(
                      .wdata(wdata_regd), .waddr(rd),
                      .raddr1(rs1), .rdata1(data_reg1),
                      .raddr2(rs2), .rdata2(data_reg2),
-                     .wen(reg_write && wbu_valid && idu_ready)
+                     .wen(ex_wb_reg_write && wbu_valid && idu_ready)
                  );
 
     // Exception handling
-    wire [31:0]mcause = ecall ? 32'd11 : 32'd0;
+    assign mcause = ecall ? 32'd11 : 32'd0;
     assign csr_write_set = (func3 == 3'b010);
-
-    ysyx_25020032_Csr csr (
-            .clk(clk), .rst(rst),
-            .addr(ext_imm[11:0]), .csr_out(csr_out), 
-            .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid && idu_ready),
-            .exception(ecall), .exception_pc(if_id_pc), .exception_cause(mcause),
-            .mtvec(mtvec), .mepc(mepc)
-        );
 
     // Decode control signal
 
@@ -160,16 +153,16 @@ module ysyx_25020032_IDU(
     //            }
     //        );
 
-    assign instr_type = {3{opcode == 7'b0110111}} & U_TYPE |
-                       {3{opcode == 7'b0110011}} & R_TYPE |
-                       {3{opcode == 7'b0100011}} & S_TYPE |
-                       {3{opcode == 7'b0010011}} & I_TYPE |
-                       {3{opcode == 7'b0010111}} & U_TYPE |
-                       {3{opcode == 7'b1101111}} & J_TYPE |
-                       {3{opcode == 7'b1100111}} & I_TYPE |
-                       {3{opcode == 7'b1100011}} & B_TYPE |
-                       {3{opcode == 7'b0000011}} & I_TYPE |
-                       {3{opcode == 7'b1110011}} & I_TYPE;
+    assign instr_type = InstrType'({3{opcode == 7'b0110111}} & U_TYPE |
+                        {3{opcode == 7'b0110011}} & R_TYPE |
+                        {3{opcode == 7'b0100011}} & S_TYPE |
+                        {3{opcode == 7'b0010011}} & I_TYPE |
+                        {3{opcode == 7'b0010111}} & U_TYPE |
+                        {3{opcode == 7'b1101111}} & J_TYPE |
+                        {3{opcode == 7'b1100111}} & I_TYPE |
+                        {3{opcode == 7'b1100011}} & B_TYPE |
+                        {3{opcode == 7'b0000011}} & I_TYPE |
+                        {3{opcode == 7'b1110011}} & I_TYPE);
 
     // Extend imm based on instruction type
     InstrType imm_src = instr_type;
@@ -191,12 +184,13 @@ module ysyx_25020032_IDU(
     //            }
     //        );
 
-    assign btype_ctrl = {4{btype_branch == BEQ}} & SUB |
+    assign btype_ctrl = AluCtrl'({4{btype_branch == BEQ}} & SUB |
                         {4{btype_branch == BNE}} & SUB |
                         {4{btype_branch == BLT}} & LESS |
                         {4{btype_branch == BGE}} & LESS |
                         {4{btype_branch == BLTU}} & LESSU |
-                        {4{btype_branch == BGEU}} & LESSU;
+                        {4{btype_branch == BGEU}} & LESSU);
+
 
     // ysyx_25020032_MuxKey #(5,3,4) alu_ctrl_mux(
     //            alu_ctrl, instr_type, {
@@ -208,11 +202,11 @@ module ysyx_25020032_IDU(
     //            }
     //        );
 
-    assign alu_ctrl = {4{instr_type == U_TYPE}} & ADD |
+    assign alu_ctrl = AluCtrl'({4{instr_type == U_TYPE}} & ADD |
                       {4{instr_type == I_TYPE}} & itype_ctrl |
                       {4{instr_type == R_TYPE}} & {func7,func3} |
                       {4{instr_type == B_TYPE}} & btype_ctrl |
-                      {4{instr_type == S_TYPE}} & ADD;
+                      {4{instr_type == S_TYPE}} & ADD);
 
     // lui & auipc special case
     wire [1:0] utype_srca = (opcode == 7'b0110111) ? 2'b01 : 2'b10;
@@ -252,7 +246,6 @@ module ysyx_25020032_IDU(
                       {2{instr_type == S_TYPE}} & 2'b1;
 
     // ecall/mret instr don't write register
-    wire reg_write;
     wire itype_reg_write = (ecall || mret) ? 1'b0 : 1'b1;
 
     // ysyx_25020032_MuxKey #(6,3,1) reg_write_mux(
@@ -285,12 +278,12 @@ module ysyx_25020032_IDU(
     //            }
     //        );
 
-    assign btype_branch = {4{func3 == 3'b000}} & BEQ |
+    assign btype_branch = Branch'({4{func3 == 3'b000}} & BEQ |
                           {4{func3 == 3'b001}} & BNE |
                           {4{func3 == 3'b100}} & BLT |
                           {4{func3 == 3'b101}} & BGE |
                           {4{func3 == 3'b110}} & BLTU |
-                          {4{func3 == 3'b111}} & BGEU;
+                          {4{func3 == 3'b111}} & BGEU);
 
     wire [3:0]system_branch = (ecall || mret) ? (ecall ? ECALL : MRET) : NO;
 
@@ -303,10 +296,10 @@ module ysyx_25020032_IDU(
     //            }
     //        );
 
-    assign branch_type = {4{opcode == 7'b1101111}} & JAL |
+    assign branch_type = Branch'({4{opcode == 7'b1101111}} & JAL |
                          {4{opcode == 7'b1100111}} & JALR |
                          {4{opcode == 7'b1100011}} & btype_branch |
-                         {4{opcode == 7'b1110011}} & system_branch;
+                         {4{opcode == 7'b1110011}} & system_branch);
 
     // ysyx_25020032_MuxKeyWithDefault #(4, 7, 2) wb_sel_mux(
     //                       wb_sel, opcode, 2'b00, {
@@ -330,7 +323,6 @@ module ysyx_25020032_IDU(
 
     assign mem_wen = {1{opcode == 7'b0100011}} & 1'b1;
 
-    wire csr_wen;
     // ysyx_25020032_MuxKey #(1, 7, 1) csr_wen_mux(
     //            csr_wen, opcode, {
     //                7'b1110011, mret? 1'b0 : 1'b1

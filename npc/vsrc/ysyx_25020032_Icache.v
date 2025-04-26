@@ -24,13 +24,13 @@ module ysyx_25020032_Icache(
 `endif
 
     // Cache definition
-    reg [31:0] cache[0:15];
-    reg [25:0] tag[0:15];
-    reg valid[0:15];
+    reg [31:0] cache[0:7];
+    reg [26:0] tag[0:7];
+    reg valid[0:7];
 
     // If request, extract cache index/tag and check whether hit
-    wire [3:0] cache_index = pc[5:2];
-    wire [25:0] cache_tag = pc[31:6];
+    wire [2:0] cache_index = pc[4:2];
+    wire [26:0] cache_tag = pc[31:5];
     wire hit = valid[cache_index] && (tag[cache_index] == cache_tag);
 
     // Assign cache data to output, addr from input
@@ -93,7 +93,7 @@ module ysyx_25020032_Icache(
             arsize <= `AXI_DEFAULT_SIZE;
             arburst <= `AXI_DEFAULT_BURST;
 
-            for(integer i = 0; i < 16; i = i + 1) begin
+            for(integer i = 0; i < 7; i = i + 1) begin
                 valid[i] <= 1'b0;
             end
         end

@@ -13,15 +13,21 @@ module ysyx_25020032_Ext(
     wire [31:0] stype_imm = {{20{instr[31]}}, instr[31:25], instr[11:7]};
     wire [31:0] btype_imm = {{19{instr[31]}}, instr[31], instr[7], instr[30:25], instr[11:8], 1'b0};
 
-    ysyx_25020032_MuxKey #(5, 3, 32) extender (
-               imm, imm_src, {
-                   I_TYPE, itype_imm,
-                   U_TYPE, utype_imm,
-                   J_TYPE, jtype_imm,
-                   S_TYPE, stype_imm,
-                   B_TYPE, btype_imm
-               }
-           );
+    // ysyx_25020032_MuxKey #(5, 3, 32) extender (
+    //            imm, imm_src, {
+    //                I_TYPE, itype_imm,
+    //                U_TYPE, utype_imm,
+    //                J_TYPE, jtype_imm,
+    //                S_TYPE, stype_imm,
+    //                B_TYPE, btype_imm
+    //            }
+    //        );
+
+    assign imm = {32{imm_src == I_TYPE}} & itype_imm |
+                 {32{imm_src == U_TYPE}} & utype_imm |
+                 {32{imm_src == J_TYPE}} & jtype_imm |
+                 {32{imm_src == S_TYPE}} & stype_imm |
+                 {32{imm_src == B_TYPE}} & btype_imm;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */
