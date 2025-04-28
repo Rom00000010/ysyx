@@ -92,10 +92,8 @@ module ysyx_25020032_WBU(
     always @(posedge clk) begin
         if(rst) begin
             wbu_valid <= 1'b0;
-            wbu_ready <= 1'b0;
         end
         else begin
-            wbu_ready <= 1'b1;
             if(exu_valid && wbu_ready) begin
                 wbu_valid <= !valid;
 
@@ -184,6 +182,7 @@ module ysyx_25020032_WBU(
     // Output logic
     always @(posedge clk or posedge rst) begin
         if(rst) begin
+            wbu_ready <= 1'b1;
             rready <= 1'b0;
             bready <= 1'b0;
             arvalid <= 1'b0;
@@ -209,6 +208,7 @@ module ysyx_25020032_WBU(
                         araddr <= raddr;
                         rready <= 1'b1;
                         arsize <= size;
+                        wbu_ready <= 1'b0;
                     end
                     else if(exu_valid && valid && mem_wen) begin
                         awvalid <= 1'b1;
@@ -218,6 +218,7 @@ module ysyx_25020032_WBU(
                         wstrb <= wmask[3:0];  // Convert 8-bit to 4-bit
                         bready <= 1'b1;
                         awsize <= size;
+                        wbu_ready <= 1'b0;
                     end
                 end
 
@@ -228,6 +229,7 @@ module ysyx_25020032_WBU(
                         arvalid <= 1'b0;
                         rdata_latch <= rdata;
                         rresp_latch <= rresp;
+                        wbu_ready <= 1'b1;
                         `ifndef SYNTHESIS
                             if(!sram_access && !sdram_access)
                                 difftest_skip_ref();
@@ -241,6 +243,7 @@ module ysyx_25020032_WBU(
                         awvalid <= 1'b0;
                         wvalid <= 1'b0;
                         bresp_latch <= bresp;
+                        wbu_ready <= 1'b1;
                         `ifndef SYNTHESIS
                             if(!sram_access && !sdram_access)
                                 difftest_skip_ref();

@@ -122,10 +122,11 @@ void step_and_dump_wave(unsigned int n)
                 total_instrs += 1;
             }
         }
-#ifndef CONFIG_PERF_MODE
-
         sim_time++;
         tfp->dump(sim_time);
+#ifndef CONFIG_PERF_MODE
+
+
 #endif
     }
 }
@@ -166,7 +167,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        difftest_step(pc);
+        //difftest_step(pc);
 
         watchpoint_inspect();
     }
@@ -229,7 +230,7 @@ int main(int argc, char **argv)
     reset(10);
 
     uint8_t *byteArray = reinterpret_cast<uint8_t *>(mem.data());
-    init_difftest(argv[3], mem.size(), (void *)byteArray, 1234);
+    //init_difftest(argv[3], mem.size(), (void *)byteArray, 1234);
 
     start_time = get_elapsed_microseconds();
     auto start = std::chrono::high_resolution_clock::now();

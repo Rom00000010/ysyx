@@ -102,21 +102,13 @@ module ysyx_25020032_Arbiter(
     localparam WBU_WRITE = 2'd3;
 
     reg [1:0] state, next_state;
-    reg last_grant_ifu; // For round-robin arbitration
 
     // State machine
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= IDLE;
-            last_grant_ifu <= 0;
         end else begin
             state <= next_state;
-            if (state == IDLE) begin
-                if (next_state == IFU_READ)
-                    last_grant_ifu <= 1;
-                else if (next_state == WBU_READ || next_state == WBU_WRITE)
-                    last_grant_ifu <= 0;
-            end
         end
     end
 
@@ -126,12 +118,12 @@ module ysyx_25020032_Arbiter(
         case (state)
             IDLE: begin
                 if (ifu_arvalid && xbar_arready && wbu_awvalid && wbu_wvalid && xbar_awready && xbar_wready) begin
-                    // Both requesting - use round robin
-                    next_state = last_grant_ifu ? WBU_WRITE : IFU_READ;
+                    next_state = WBU_WRITE;
+                    $display("IFU waiting for WBU write");
                 end
                 else if (ifu_arvalid && xbar_arready && wbu_arvalid && xbar_arready) begin
-                    // Both want to read - use round robin
-                    next_state = last_grant_ifu ? WBU_READ : IFU_READ;
+                    next_state = WBU_READ;
+                    $display("IFU waiting for WBU read");
                 end
                 else if (ifu_arvalid && xbar_arready)
                     next_state = IFU_READ;
@@ -206,9 +198,28 @@ module ysyx_25020032_Arbiter(
                 wbu_awready = xbar_awready;
                 wbu_wready = xbar_wready;
 
-                // TODO: HANDLE SIMULTANEOUSLY ACCESS CASE
-                if(ifu_arvalid) begin
-                    xbar_arvalid = 1;
+                if(ifu_arvalid && wbu_awvalid && wbu_wvalid) begin 
+                    xbar_awvalid = wbu_awvalid;
+                    xbar_awaddr = wbu_awaddr;
+                    xbar_awid = wbu_awid;
+                    xbar_awlen = wbu_awlen;
+                    xbar_awsize = wbu_awsize;
+                    xbar_awburst = wbu_awburst;
+                    xbar_wvalid = wbu_wvalid;
+                    xbar_wdata = wbu_wdata;
+                    xbar_wstrb = wbu_wstrb;
+                    xbar_wlast = wbu_wlast;
+                end
+                else if(ifu_arvalid && wbu_arvalid) begin
+                    xbar_arvalid = wbu_arvalid;
+                    xbar_araddr = wbu_araddr;
+                    xbar_arid = wbu_arid;
+                    xbar_arlen = wbu_arlen;
+                    xbar_arsize = wbu_arsize;
+                    xbar_arburst = wbu_arburst;
+                end
+                else if(ifu_arvalid) begin
+                    xbar_arvalid = ifu_arvalid;
                     xbar_araddr = ifu_araddr;
                     xbar_arid = ifu_arid;
                     xbar_arlen = ifu_arlen;
@@ -216,19 +227,19 @@ module ysyx_25020032_Arbiter(
                     xbar_arburst = ifu_arburst;
                 end
                 else if(wbu_awvalid && wbu_wvalid) begin
-                    xbar_awvalid = 1;
+                    xbar_awvalid = wbu_awvalid;
                     xbar_awaddr = wbu_awaddr;
                     xbar_awid = wbu_awid;
                     xbar_awlen = wbu_awlen;
                     xbar_awsize = wbu_awsize;
                     xbar_awburst = wbu_awburst;
-                    xbar_wvalid = 1;
+                    xbar_wvalid = wbu_wvalid;
                     xbar_wdata = wbu_wdata;
                     xbar_wstrb = wbu_wstrb;
                     xbar_wlast = wbu_wlast;
                 end
                 else if(wbu_arvalid) begin
-                    xbar_arvalid = 1;
+                    xbar_arvalid = wbu_arvalid;
                     xbar_araddr = wbu_araddr;
                     xbar_arid = wbu_arid;
                     xbar_arlen = wbu_arlen;

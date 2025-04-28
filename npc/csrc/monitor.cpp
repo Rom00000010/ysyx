@@ -44,11 +44,11 @@ void init_monitor(int argc, char **argv, vector<uint8_t> &mem)
 {
     init_mem(argc, argv, mem);
 
-    init_sdb();
+    //init_sdb();
 
-    initBuffer();
+    //initBuffer();
 
-    init_elf(argv[2]);
+    //init_elf(argv[2]);
 }
 
 void disassembleAndPrint(uint32_t inst, char *buf, bool flag)

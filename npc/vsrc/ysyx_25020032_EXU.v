@@ -67,10 +67,8 @@ module ysyx_25020032_EXU(
     always @(posedge clk) begin
         if(rst) begin
             exu_valid <= 1'b0;
-            exu_ready <= 1'b0;
         end
         else begin
-            exu_ready <= 1'b1;
             if(idu_valid && exu_ready) begin
                 exu_valid <= 1'b1;
                 id_ex_alu_ctrl <= alu_ctrl;
@@ -93,11 +91,13 @@ module ysyx_25020032_EXU(
 
                 id_ex_pc <= pc;
             end
-            else begin
+            else if(exu_valid && wbu_ready) begin
                 exu_valid <= 1'b0;
             end
         end
     end
+
+    assign exu_ready = wbu_ready;
     // =========================================================
 
     ysyx_25020032_Csr csr (

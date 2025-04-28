@@ -86,20 +86,20 @@ module ysyx_25020032_IDU(
     always @(posedge clk) begin
         if(rst) begin
             idu_valid <= 1'b0;
-            idu_ready <= 1'b0;
         end
         else begin
-            idu_ready <= 1'b1;
             if(ifu_valid && idu_ready) begin
                 idu_valid <= 1'b1;
                 if_id_pc <= pc;
                 if_id_instr <= instr;
             end
-            else begin
+            else if(idu_valid && exu_ready) begin
                 idu_valid <= 1'b0;
             end
         end
     end
+
+    assign idu_ready = exu_ready;
 
     // Extract instruction fields
     wire [2:0] func3 = if_id_instr[14:12];

@@ -27,11 +27,11 @@ module ysyx_25020032_IFU(
         end
     `endif
 
-    wire [31:0]next_pc = branch_taken ? branch_target : pc + 32'd4;
+    wire [31:0]next_pc = pc + 32'd4;
     // PC register
     ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h3000_0000) ) pc_reg (
             .clk(clk), .rst(rst),
-            .din(next_pc), .dout(pc), .wen(wbu_valid && ifu_ready)
+            .din(next_pc), .dout(pc), .wen(ifu_valid && idu_ready)
         );
 
 // ======================State Machine=======================
@@ -60,7 +60,7 @@ module ysyx_25020032_IFU(
                 end
             end
             IDLE: begin
-                if(wbu_valid && ifu_ready) begin
+                if(ifu_valid && idu_ready) begin
                     next_state = FETCH;
                 end
             end
@@ -91,8 +91,8 @@ module ysyx_25020032_IFU(
                     end
                 end
                 IDLE: begin
-                    ifu_valid <= 1'b0;
-                    if(wbu_valid && ifu_ready) begin
+                    if(ifu_valid && idu_ready) begin
+                        ifu_valid <= 1'b0;
                         icache_valid <= 1'b1;
                     end
                 end
@@ -101,6 +101,6 @@ module ysyx_25020032_IFU(
         end
     end
 
-    assign ifu_ready = (state == IDLE) ? 1'b1 : 1'b0;
+    assign ifu_ready = 1'b1;
 
 endmodule

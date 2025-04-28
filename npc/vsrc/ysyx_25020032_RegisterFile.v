@@ -20,7 +20,7 @@ module ysyx_25020032_RegisterFile #(ADDR_WIDTH = 1, DATA_WIDTH = 1) (
     // $0 always keep zero
     wire write_enable = wen & (waddr != 0);
 
-    assign rdata1 = {32{raddr1 != 0}} & rf[raddr1-1];
+    assign rdata1 = raddr1 == 4'd1 ? 32'h0f000000 : {32{raddr1 != 0}} & rf[raddr1-1];
     assign rdata2 = {32{raddr2 != 0}} & rf[raddr2-1];
 
 `ifndef SYNTHESIS
