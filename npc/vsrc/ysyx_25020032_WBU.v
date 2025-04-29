@@ -25,6 +25,8 @@ module ysyx_25020032_WBU(
         input [31:0]mepc,
         input [31:0]mtvec,
         input [31:0]pc,
+        input [3:0]rd,
+        input [31:0]instr,
 
         input [31:0]alu_res,
         input [31:0]raddr,
@@ -36,13 +38,17 @@ module ysyx_25020032_WBU(
         input idu_ready,
 
         output [31:0]wdata_regd,
+        output [3:0] ex_wb_rd,
         output [31:0]csr_in,
         output reg ex_wb_csr_wen,
         output reg ex_wb_reg_write,
+        output reg [31:0] ex_wb_ext_imm,
 
         output access_fault,
         output [31:0]branch_target,
         output branch_taken,
+
+        output reg proc_instr,
 
         // AXI interface
         `AXI_MASTER_READ_ADDR_PORTS,
@@ -79,7 +85,6 @@ module ysyx_25020032_WBU(
     reg [1:0] ex_wb_wb_sel;
     reg ex_wb_csr_write_set;
     
-    reg [31:0] ex_wb_ext_imm;
     reg [31:0] ex_wb_data_reg1;
     reg [31:0] ex_wb_csr_out;
     reg [31:0] ex_wb_mepc;
@@ -88,6 +93,8 @@ module ysyx_25020032_WBU(
     reg [31:0] ex_wb_raddr;
 
     reg [31:0] ex_wb_alu_res;
+
+    reg [31:0] ex_wb_instr;
 
     always @(posedge clk) begin
         if(rst) begin
@@ -106,6 +113,7 @@ module ysyx_25020032_WBU(
 
                 ex_wb_ext_imm <= ext_imm;
                 ex_wb_data_reg1 <= data_reg1;
+                ex_wb_rd <= rd;
                 ex_wb_csr_out <= csr_out;
                 ex_wb_mepc <= mepc;
                 ex_wb_mtvec <= mtvec;
@@ -115,9 +123,11 @@ module ysyx_25020032_WBU(
 
                 ex_wb_raddr <= raddr;
 
+                ex_wb_instr <= instr;
+
             end else if (rready && rvalid || bready && bvalid) begin
                 wbu_valid <= 1'b1;
-                end else begin
+            end else if(wbu_valid)begin
                 wbu_valid <= 1'b0;
             end     
         end
@@ -183,6 +193,7 @@ module ysyx_25020032_WBU(
     always @(posedge clk or posedge rst) begin
         if(rst) begin
             wbu_ready <= 1'b1;
+            proc_instr <= 1'b0;
             rready <= 1'b0;
             bready <= 1'b0;
             arvalid <= 1'b0;
@@ -209,6 +220,7 @@ module ysyx_25020032_WBU(
                         rready <= 1'b1;
                         arsize <= size;
                         wbu_ready <= 1'b0;
+                        proc_instr <= 1'b1;
                     end
                     else if(exu_valid && valid && mem_wen) begin
                         awvalid <= 1'b1;
@@ -219,7 +231,13 @@ module ysyx_25020032_WBU(
                         bready <= 1'b1;
                         awsize <= size;
                         wbu_ready <= 1'b0;
+                        proc_instr <= 1'b1;
+                    end 
+                    else if(exu_valid && !valid) begin
+                        proc_instr <= 1'b1;
                     end
+
+                    if(wbu_valid && !exu_valid) proc_instr <= 1'b0;
                 end
 
                 // TODO: Need to latch resp

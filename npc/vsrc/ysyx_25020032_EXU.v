@@ -25,7 +25,9 @@ module ysyx_25020032_EXU(
         input [31:0]ext_imm,
         input [31:0]data_reg1,
         input [31:0]data_reg2,
+        input [3:0]rd,
         input [31:0]pc,
+        input [31:0]instr,
 
         // EXU->WBU synchronization
         output reg exu_valid,
@@ -42,10 +44,12 @@ module ysyx_25020032_EXU(
 
         output reg [31:0] id_ex_ext_imm,
         output reg [31:0] id_ex_data_reg1,
+        output reg [3:0] id_ex_rd,
         output [31:0] id_ex_csr_out,
         output [31:0] id_ex_mepc,
         output [31:0] id_ex_mtvec,
         output reg [31:0] id_ex_pc,
+        output reg [31:0] id_ex_instr,
 
         output wire [31:0]alu_res,
         output [31:0]raddr,
@@ -54,7 +58,8 @@ module ysyx_25020032_EXU(
 
         input wbu_valid,
         input [31:0]csr_in,
-        input csr_wen
+        input csr_wen,
+        input [31:0]ex_wb_ext_imm
     );
 
     reg [3:0] id_ex_alu_ctrl;
@@ -88,8 +93,10 @@ module ysyx_25020032_EXU(
                 id_ex_ext_imm <= ext_imm;
                 id_ex_data_reg1 <= data_reg1;
                 id_ex_data_reg2 <= data_reg2;
+                id_ex_rd <= rd;
 
                 id_ex_pc <= pc;
+                id_ex_instr <= instr;
             end
             else if(exu_valid && wbu_ready) begin
                 exu_valid <= 1'b0;
@@ -102,9 +109,9 @@ module ysyx_25020032_EXU(
 
     ysyx_25020032_Csr csr (
         .clk(clk), .rst(rst),
-        .addr(id_ex_ext_imm[11:0]), .csr_out(id_ex_csr_out), 
-        .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid && exu_ready),
-        .exception(id_ex_ecall), .exception_pc(id_ex_pc), .exception_cause(id_ex_mcause),
+        .raddr(id_ex_ext_imm[11:0]), .waddr(ex_wb_ext_imm[11:0]), .csr_out(id_ex_csr_out), 
+        .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid),
+        .exception(id_ex_ecall), .exception_pc(id_ex_pc), .exception_cause( id_ex_mcause),
         .mtvec(id_ex_mtvec), .mepc(id_ex_mepc)
     );
 

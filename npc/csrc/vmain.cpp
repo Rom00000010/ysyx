@@ -230,7 +230,7 @@ int main(int argc, char **argv)
     reset(10);
 
     uint8_t *byteArray = reinterpret_cast<uint8_t *>(mem.data());
-    //init_difftest(argv[3], mem.size(), (void *)byteArray, 1234);
+    init_difftest(argv[3], mem.size(), (void *)byteArray, 1234);
 
     start_time = get_elapsed_microseconds();
     auto start = std::chrono::high_resolution_clock::now();

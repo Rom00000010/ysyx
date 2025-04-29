@@ -7,4 +7,8 @@ all:
 	riscv64-linux-gnu-objdump -d test.elf > test.txt
 
 run:
-	../obj_dir/VysyxSoCFull ./test.bin
+	../obj_dir/VysyxSoCFull ./test.bin ./test.elf /home/rom/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so
+
+gdb:
+	gdb --args ../obj_dir/VysyxSoCFull ./test.bin ./test.elf /home/rom/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so
+

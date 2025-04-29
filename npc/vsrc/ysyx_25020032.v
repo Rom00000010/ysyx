@@ -166,8 +166,10 @@ module ysyx_25020032 (
     // Operand 
     wire [31:0]ext_imm;
     wire [31:0]data_reg1, data_reg2;
+    wire [3:0]rd;
     // if-id pipeline register
     wire [31:0]if_id_pc;
+    wire [31:0]if_id_instr;
 
     ysyx_25020032_IDU idu (
             .clk(clock), .rst(reset), 
@@ -180,10 +182,14 @@ module ysyx_25020032 (
             .alu_ctrl(alu_ctrl), .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
             .branch_type(branch_type), .wb_sel(wb_sel), .reg_write(reg_write),
             .mem_wen(mem_wen), .valid(valid), .mem_width(mem_width),
-            .ext_imm(ext_imm), .data_reg1(data_reg1), .data_reg2(data_reg2), 
+            .ext_imm(ext_imm), .data_reg1(data_reg1), .data_reg2(data_reg2), .rd(rd),
             .csr_write_set(csr_write_set), .csr_wen(csr_wen), .ecall(ecall), .mcause(mcause),
 
-            .wbu_valid(wbu_valid), .wdata_regd(wdata_regd), .ex_wb_reg_write(ex_wb_reg_write)
+            .wbu_valid(wbu_valid), .wdata_regd(wdata_regd), .ex_wb_reg_write(ex_wb_reg_write), .ex_wb_rd(ex_wb_rd),
+
+            .wbu_proc_instr(proc_instr), .exu_valid(exu_valid), .id_ex_reg_write(id_ex_reg_write), .id_ex_rd(id_ex_rd),
+
+            .if_id_instr(if_id_instr)
     );
 
     wire [31:0]alu_res;
@@ -202,7 +208,9 @@ module ysyx_25020032 (
 
     wire [31:0] id_ex_ext_imm;
     wire [31:0] id_ex_data_reg1;
+    wire [3:0] id_ex_rd;
     wire [31:0] id_ex_pc;
+    wire [31:0] id_ex_instr;
 
     // Csr 
     wire [31:0]csr_out;
@@ -218,28 +226,34 @@ module ysyx_25020032 (
             .valid(valid), .mem_wen(mem_wen), .csr_write_set(csr_write_set), .wb_sel(wb_sel), .id_csr_wen(csr_wen), .ecall(ecall), .mcause(mcause), .reg_write(reg_write),
 
             .alu_srca(alu_srca), .alu_srcb(alu_srcb), 
-            .data_reg1(data_reg1), .data_reg2(data_reg2), .id_ex_csr_out(csr_out),
-            .pc(if_id_pc), .ext_imm(ext_imm), 
+            .data_reg1(data_reg1), .data_reg2(data_reg2), .id_ex_csr_out(csr_out), .rd(rd),
+            .pc(if_id_pc), .ext_imm(ext_imm), .instr(if_id_instr),
 
             .exu_valid(exu_valid), .wbu_ready(wbu_ready), 
 
             .alu_res(alu_res), .raddr(raddr), .wdata(wdata), .wmask(wmask),
 
-            .id_ex_pc(id_ex_pc), .id_ex_data_reg1(id_ex_data_reg1), .id_ex_ext_imm(id_ex_ext_imm), .id_ex_mtvec(mtvec), .id_ex_mepc(mepc),
+            .id_ex_pc(id_ex_pc), .id_ex_data_reg1(id_ex_data_reg1), .id_ex_ext_imm(id_ex_ext_imm), .id_ex_mtvec(mtvec), .id_ex_mepc(mepc), .id_ex_rd(id_ex_rd),
 
             .id_ex_valid(id_ex_valid), .id_ex_mem_wen(id_ex_mem_wen), .id_ex_mem_width(id_ex_mem_width), .id_ex_wb_sel(id_ex_wb_sel), .id_ex_csr_write_set(id_ex_csr_write_set), .id_ex_branch_type(id_ex_branch_type), .id_ex_csr_wen(id_ex_csr_wen), .id_ex_reg_write(id_ex_reg_write),
 
-            .wbu_valid(wbu_valid), .csr_wen(ex_wb_csr_wen), .csr_in(csr_in)
+            .wbu_valid(wbu_valid), .csr_wen(ex_wb_csr_wen), .csr_in(csr_in), .ex_wb_ext_imm(ex_wb_ext_imm),
+
+            .id_ex_instr(id_ex_instr)
     );
 
     // Writeback result
     wire [31:0]csr_in, wdata_regd;
+    wire [3:0]ex_wb_rd;
     wire ex_wb_csr_wen;
     wire ex_wb_reg_write;
+    wire [31:0]ex_wb_ext_imm;
 
     wire access_fault;
     wire branch_taken;
     wire [31:0]branch_target;
+
+    wire proc_instr;
     ysyx_25020032_WBU wbu(
         .clk(clock), .rst(reset),
 
@@ -248,13 +262,15 @@ module ysyx_25020032 (
         .valid(id_ex_valid), .mem_wen(id_ex_mem_wen), 
         .wb_sel(id_ex_wb_sel), .csr_write_set(id_ex_csr_write_set), .csr_wen(id_ex_csr_wen), .mem_width(id_ex_mem_width), .branch_type(id_ex_branch_type), .reg_write(id_ex_reg_write),
         .csr_out(csr_out), .pc(id_ex_pc), 
-        .data_reg1(id_ex_data_reg1), .ext_imm(id_ex_ext_imm), .mtvec(mtvec), .mepc(mepc),
+        .data_reg1(id_ex_data_reg1), .ext_imm(id_ex_ext_imm), .mtvec(mtvec), .mepc(mepc), .rd(id_ex_rd),
         .raddr(raddr), .wrdata(wdata), .wmask(wmask), .alu_res(alu_res), 
 
         .wbu_valid(wbu_valid), .idu_ready(idu_ready),
 
-        .wdata_regd(wdata_regd), .csr_in(csr_in), .ex_wb_csr_wen(ex_wb_csr_wen), .access_fault(access_fault), 
-        .branch_taken(branch_taken), .branch_target(branch_target), .ex_wb_reg_write(ex_wb_reg_write),
+        .wdata_regd(wdata_regd), .csr_in(csr_in), .ex_wb_csr_wen(ex_wb_csr_wen), .access_fault(access_fault), .ex_wb_ext_imm(ex_wb_ext_imm),
+        .branch_taken(branch_taken), .branch_target(branch_target), .ex_wb_reg_write(ex_wb_reg_write), .ex_wb_rd(ex_wb_rd),
+
+        .proc_instr(proc_instr),
 
         // AXI interface
         .arid(wbu_arid), .arburst(wbu_arburst), .arlen(wbu_arlen),
@@ -270,7 +286,9 @@ module ysyx_25020032 (
         .wlast(wbu_wlast),
         
         .bid(wbu_bid),
-        .bresp(wbu_bresp), .bvalid(wbu_bvalid), .bready(wbu_bready)
+        .bresp(wbu_bresp), .bvalid(wbu_bvalid), .bready(wbu_bready),
+
+        .instr(id_ex_instr)
     );
 
     // Instantiate the arbiter
@@ -565,11 +583,11 @@ module ysyx_25020032 (
     endfunction
 
     function automatic int get_instr();
-        get_instr = instr;
+        get_instr = wbu.ex_wb_instr;
     endfunction
 
     function automatic int get_pc_val();
-        get_pc_val = pc;
+        get_pc_val = wbu.ex_wb_pc;
     endfunction
 
     export "DPI-C" function get_dnpc;

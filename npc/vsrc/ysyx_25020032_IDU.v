@@ -11,6 +11,9 @@ module ysyx_25020032_IDU(
 
         // if-id pipeline register, store pc for later exu/wbu
         output reg [31:0]if_id_pc,
+        // for monitors
+        output reg [31:0]if_id_instr,
+
 
         // IDU->EXU synchronization
         output reg idu_valid,
@@ -35,11 +38,19 @@ module ysyx_25020032_IDU(
         output [31:0]ext_imm,
         output [31:0]data_reg1,
         output [31:0]data_reg2,
+        output [3:0]rd,
 
         // WBU->IDU synchronization
         input wbu_valid,
         input [31:0]wdata_regd,
-        input ex_wb_reg_write
+        input ex_wb_reg_write,
+        input [3:0]ex_wb_rd,
+
+        // RAW detection
+        input exu_valid,
+        input wbu_proc_instr,
+        input id_ex_reg_write,
+        input [3:0]id_ex_rd
     );
 
 `ifdef DECODE_EVENT
@@ -82,24 +93,79 @@ module ysyx_25020032_IDU(
     end
 `endif
     
-    reg [31:0]if_id_instr;
+    reg idu_valid_noraw;
     always @(posedge clk) begin
         if(rst) begin
-            idu_valid <= 1'b0;
+            idu_valid_noraw <= 1'b0;
         end
         else begin
             if(ifu_valid && idu_ready) begin
-                idu_valid <= 1'b1;
+                idu_valid_noraw <= 1'b1;
                 if_id_pc <= pc;
                 if_id_instr <= instr;
             end
             else if(idu_valid && exu_ready) begin
-                idu_valid <= 1'b0;
+                idu_valid_noraw <= 1'b0;
             end
         end
     end
 
-    assign idu_ready = exu_ready;
+    assign idu_valid = idu_valid_noraw && !isRAW;
+
+    reg isRAW;
+    reg raw_with_exu;
+    reg raw_with_wbu;
+
+    always @* begin
+        isRAW = 1'b0;
+        raw_with_exu = 1'b0;
+        raw_with_wbu = 1'b0;
+        unique case (instr_type)
+            I_TYPE:begin 
+                if(ecall || rs1 == 0)begin
+                    isRAW = 1'b0;
+                end
+                else begin
+                    raw_with_exu = exu_valid && id_ex_reg_write && id_ex_rd == rs1;
+                    raw_with_wbu = wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs1;
+                    isRAW = raw_with_exu || raw_with_wbu;
+                end
+            end 
+            R_TYPE:begin
+                if(rs1 == 0 && rs2 == 0)begin
+                    isRAW = 1'b0;
+                end
+                else begin
+                    raw_with_exu = exu_valid && id_ex_reg_write && id_ex_rd == rs1 || exu_valid && id_ex_reg_write && id_ex_rd == rs2;
+                    raw_with_wbu = wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs1 || wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs2;
+                    isRAW = raw_with_exu || raw_with_wbu;
+                end
+            end
+            S_TYPE:begin                 
+                if(rs1 == 0 && rs2 == 0)begin
+                    isRAW = 1'b0;
+                end
+                else begin
+                    raw_with_exu = exu_valid && id_ex_reg_write && id_ex_rd == rs1 || exu_valid && id_ex_reg_write && id_ex_rd == rs2;
+                    raw_with_wbu = wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs1 || wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs2;
+                    isRAW = raw_with_exu || raw_with_wbu;
+                end end
+            B_TYPE:begin 
+                if(rs1 == 0 && rs2 == 0)begin
+                    isRAW = 1'b0;
+                end
+                else begin
+                    raw_with_exu = exu_valid && id_ex_reg_write && id_ex_rd == rs1 || exu_valid && id_ex_reg_write && id_ex_rd == rs2;
+                    raw_with_wbu = wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs1 || wbu_proc_instr && ex_wb_reg_write && ex_wb_rd == rs2;
+                    isRAW = raw_with_exu || raw_with_wbu;
+                end
+            end
+            U_TYPE:begin isRAW = 1'b0; end
+            J_TYPE:begin isRAW = 1'b0; end
+        endcase
+    end
+
+    assign idu_ready = exu_ready && idu_valid_noraw && !isRAW || !idu_valid_noraw;
 
     // Extract instruction fields
     wire [2:0] func3 = if_id_instr[14:12];
@@ -121,14 +187,14 @@ module ysyx_25020032_IDU(
     // Fetch Operand
     wire [3:0] rs1 = if_id_instr[18:15];
     wire [3:0] rs2 = if_id_instr[23:20];
-    wire [3:0] rd = if_id_instr[10:7];
+    assign rd = if_id_instr[10:7];
 
     ysyx_25020032_RegisterFile #(.ADDR_WIDTH(4), .DATA_WIDTH(32)) regfile (
                      .clk(clk), .rst(rst),
-                     .wdata(wdata_regd), .waddr(rd),
+                     .wdata(wdata_regd), .waddr(ex_wb_rd),
                      .raddr1(rs1), .rdata1(data_reg1),
                      .raddr2(rs2), .rdata2(data_reg2),
-                     .wen(ex_wb_reg_write && wbu_valid && idu_ready)
+                     .wen(ex_wb_reg_write && wbu_valid)
                  );
 
     // Exception handling

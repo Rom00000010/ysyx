@@ -45,7 +45,7 @@ void get_cpu_state(CPU_state *s)
         cpu.gpr[i] = get_reg_val_by_abi(regs[i]);
     }
     SET_TOP
-    cpu.pc = get_pc_val();
+    cpu.pc = 0x30000000;
 }
 
 void init_difftest(char *ref_so_file, long img_size, void *mem, int port)
@@ -91,7 +91,7 @@ static void checkregs(CPU_state *ref, uint32_t pc)
         }
     }
 
-    if (!difftest_check_reg("$pc", pc, ref->pc, cpu.pc))
+    if (!difftest_check_reg("$pc", cpu.pc, ref->pc, pc))
     {
         goto error;
     }
@@ -107,7 +107,7 @@ error:
 }
 
 void difftest_step(uint32_t pc)
-{
+{   
     CPU_state ref_r;
 
     if (is_skip_ref)
@@ -122,5 +122,5 @@ void difftest_step(uint32_t pc)
     ref_difftest_exec(1);
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
 
-    checkregs(&ref_r, pc);
+    checkregs(&ref_r, pc+4);
 }
