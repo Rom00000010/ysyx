@@ -13,12 +13,13 @@
 
 //#define CONFIG_WATCHPOINT
 //#define CONFIG_FTRACE
-//#define CONFIG_PERF_MODE
+#define CONFIG_PERF_MODE
 
 extern "C" int get_reg_val_by_abi(const char *abi_name);
 extern "C" void print_rf();
 extern "C" int get_dnpc();
 extern "C" int get_instr();
 extern "C" int get_pc_val();
+extern "C" int get_next_pc();
 extern "C" int ifu_skip();
 extern "C" int wbu_skip();

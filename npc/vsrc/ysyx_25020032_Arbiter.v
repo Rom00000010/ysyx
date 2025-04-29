@@ -119,11 +119,9 @@ module ysyx_25020032_Arbiter(
             IDLE: begin
                 if (ifu_arvalid && xbar_arready && wbu_awvalid && wbu_wvalid && xbar_awready && xbar_wready) begin
                     next_state = WBU_WRITE;
-                    $display("IFU waiting for WBU write");
                 end
                 else if (ifu_arvalid && xbar_arready && wbu_arvalid && xbar_arready) begin
                     next_state = WBU_READ;
-                    $display("IFU waiting for WBU read");
                 end
                 else if (ifu_arvalid && xbar_arready)
                     next_state = IFU_READ;
@@ -209,6 +207,7 @@ module ysyx_25020032_Arbiter(
                     xbar_wdata = wbu_wdata;
                     xbar_wstrb = wbu_wstrb;
                     xbar_wlast = wbu_wlast;
+                    ifu_arready = 0;
                 end
                 else if(ifu_arvalid && wbu_arvalid) begin
                     xbar_arvalid = wbu_arvalid;
@@ -217,6 +216,7 @@ module ysyx_25020032_Arbiter(
                     xbar_arlen = wbu_arlen;
                     xbar_arsize = wbu_arsize;
                     xbar_arburst = wbu_arburst;
+                    ifu_arready = 0;
                 end
                 else if(ifu_arvalid) begin
                     xbar_arvalid = ifu_arvalid;

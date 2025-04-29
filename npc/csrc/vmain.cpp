@@ -30,7 +30,7 @@ vector<uint8_t> psram(4 * 1024 * 1024);
 void sdb_mainloop();
 void init_monitor(int argc, char **argv, vector<uint8_t> &mem);
 void init_difftest(char *ref_so_file, long img_size, void *mem, int port);
-void difftest_step(uint32_t pc);
+void difftest_step(uint32_t pc, uint32_t next_pc);
 void disassembleAndPrint(uint32_t inst, char *buf, bool flag);
 void watchpoint_inspect();
 void ftrace(uint32_t pc, uint32_t instr);
@@ -122,11 +122,10 @@ void step_and_dump_wave(unsigned int n)
                 total_instrs += 1;
             }
         }
+
+#ifndef CONFIG_PERF_MODE
         sim_time++;
         tfp->dump(sim_time);
-#ifndef CONFIG_PERF_MODE
-
-
 #endif
     }
 }
@@ -144,9 +143,11 @@ void cpu_exec(unsigned int n)
         // Skip internal cycle(don't cause state change)
         SET_WBU
         uint32_t wbu = wbu_skip();
+        // PC and Instr to be retired
         SET_TOP
         uint32_t instr = get_instr();
         uint32_t pc = get_pc_val();
+        uint32_t next_pc = get_next_pc();
 
         if (wbu)
         {
@@ -167,7 +168,7 @@ void cpu_exec(unsigned int n)
         writeBuffer(log_buf);
 
         step_and_dump_wave(2);
-        //difftest_step(pc);
+        //difftest_step(pc, next_pc);
 
         watchpoint_inspect();
     }

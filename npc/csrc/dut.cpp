@@ -45,7 +45,7 @@ void get_cpu_state(CPU_state *s)
         cpu.gpr[i] = get_reg_val_by_abi(regs[i]);
     }
     SET_TOP
-    cpu.pc = 0x30000000;
+    cpu.pc = get_next_pc();
 }
 
 void init_difftest(char *ref_so_file, long img_size, void *mem, int port)
@@ -73,13 +73,14 @@ void init_difftest(char *ref_so_file, long img_size, void *mem, int port)
     assert(ref_difftest_init);
 
     get_cpu_state(&cpu);
+    cpu.pc = 0x30000000;
 
     ref_difftest_init(port);
     ref_difftest_memcpy(FLASH_BASE, mem, img_size, DIFFTEST_TO_REF);
     ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
 }
 
-static void checkregs(CPU_state *ref, uint32_t pc)
+static void checkregs(CPU_state *ref, uint32_t pc, uint32_t next_pc)
 {
     get_cpu_state(&cpu);
 
@@ -91,7 +92,7 @@ static void checkregs(CPU_state *ref, uint32_t pc)
         }
     }
 
-    if (!difftest_check_reg("$pc", cpu.pc, ref->pc, pc))
+    if (!difftest_check_reg("$pc", pc, ref->pc, next_pc))
     {
         goto error;
     }
@@ -106,7 +107,7 @@ error:
     exit(1);
 }
 
-void difftest_step(uint32_t pc)
+void difftest_step(uint32_t pc, uint32_t next_pc)
 {   
     CPU_state ref_r;
 
@@ -122,5 +123,5 @@ void difftest_step(uint32_t pc)
     ref_difftest_exec(1);
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
 
-    checkregs(&ref_r, pc+4);
+    checkregs(&ref_r, pc, next_pc);
 }

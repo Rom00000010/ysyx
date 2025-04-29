@@ -117,7 +117,7 @@ void ftrace(uint32_t pc, uint32_t instr)
 {
 #ifdef CONFIG_FTRACE
     const char *name = func_name(pc);
-    const char *target_name = func_name(get_dnpc());
+    const char *target_name = func_name(get_next_pc());
     int rs1 = BITS(instr, 19, 15);
     int rs2 = BITS(instr, 24, 20);
     int rd = BITS(instr, 11, 7);
@@ -144,7 +144,7 @@ void ftrace(uint32_t pc, uint32_t instr)
             {
                 printf("  ");
             }
-            printf("call [%s@0x%x]\n", target_name, get_dnpc());
+            printf("call [%s@0x%x]\n", target_name, get_next_pc());
             depth++;
         }
     }
@@ -158,7 +158,7 @@ void ftrace(uint32_t pc, uint32_t instr)
             {
                 printf("  ");
             }
-            printf("call [%s@0x%x]\n", target_name, get_dnpc());
+            printf("call [%s@0x%x]\n", target_name, get_next_pc());
             depth++;
         }
     }

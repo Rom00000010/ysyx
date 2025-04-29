@@ -295,7 +295,9 @@ module ysyx_25020032 (
         .bid(wbu_bid),
         .bresp(wbu_bresp), .bvalid(wbu_bvalid), .bready(wbu_bready),
 
-        .instr(id_ex_instr)
+        .instr(id_ex_instr),
+
+        .branch_taken(flush), .branch_target(branch_target)
     );
 
     // Instantiate the arbiter
@@ -585,21 +587,24 @@ module ysyx_25020032 (
     assign io_slave_bid = 4'b0;
 
 `ifndef SYNTHESIS
-    function automatic int get_dnpc();
-        get_dnpc = branch_target;
-    endfunction
 
     function automatic int get_instr();
         get_instr = wbu.ex_wb_instr;
     endfunction
 
+    // instr of the pc to be retired
     function automatic int get_pc_val();
         get_pc_val = wbu.ex_wb_pc;
     endfunction
 
-    export "DPI-C" function get_dnpc;
+    // next pc
+    function automatic int get_next_pc();
+        get_next_pc = wbu.ex_wb_branch_taken ? wbu.ex_wb_branch_target : wbu.ex_wb_pc + 4;
+    endfunction
+
     export "DPI-C" function get_instr;
     export "DPI-C" function get_pc_val;
+    export "DPI-C" function get_next_pc;
 `endif
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

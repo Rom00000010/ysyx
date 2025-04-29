@@ -73,7 +73,7 @@ module ysyx_25020032_IDU(
     end
 
     always @(posedge clk) begin
-        if(idu_valid) begin
+        if(idu_valid && exu_ready) begin
             if(opcode == 7'b0010011 || opcode == 7'b0110011 || opcode == 7'b0110111 || opcode == 7'b0010111) begin  
                 compute_instr_cnt <= compute_instr_cnt + 1;
             end

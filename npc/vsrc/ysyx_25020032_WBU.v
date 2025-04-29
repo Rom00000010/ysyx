@@ -45,6 +45,10 @@ module ysyx_25020032_WBU(
 
         output reg proc_instr,
 
+        // Difftest
+        input branch_taken,
+        input [31:0]branch_target,
+
         // AXI interface
         `AXI_MASTER_READ_ADDR_PORTS,
         `AXI_MASTER_WRITE_ADDR_PORTS
@@ -88,6 +92,9 @@ module ysyx_25020032_WBU(
 
     reg [31:0] ex_wb_instr;
 
+    reg ex_wb_branch_taken;
+    reg [31:0] ex_wb_branch_target;
+
     always @(posedge clk) begin
         if(rst) begin
             wbu_valid <= 1'b0;
@@ -113,6 +120,9 @@ module ysyx_25020032_WBU(
                 ex_wb_raddr <= raddr;
 
                 ex_wb_instr <= instr;
+
+                ex_wb_branch_taken <= branch_taken;
+                ex_wb_branch_target <= branch_target;
 
             end else if (rready && rvalid || bready && bvalid) begin
                 wbu_valid <= 1'b1;
