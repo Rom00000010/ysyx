@@ -7,10 +7,8 @@ module ysyx_25020032_IFU(
         input idu_ready,
         output reg[31:0]instr,
 
-        // WBU->IFU synchronization
-        input wbu_valid,
-        output reg ifu_ready,
-        input branch_taken,
+        // Pipeline flush
+        input flush,
         input [31:0]branch_target,
 
         // IFU->ICache synchronization
@@ -27,11 +25,11 @@ module ysyx_25020032_IFU(
         end
     `endif
 
-    wire [31:0]next_pc = pc + 32'd4;
+    wire [31:0]next_pc = flush ? branch_target : pc + 32'd4;
     // PC register
     ysyx_25020032_Reg #(.WIDTH(32), .RESET_VAL(32'h3000_0000) ) pc_reg (
             .clk(clk), .rst(rst),
-            .din(next_pc), .dout(pc), .wen(ifu_valid && idu_ready)
+            .din(next_pc), .dout(pc), .wen(ifu_valid && idu_ready || flush)
         );
 
 // ======================State Machine=======================
@@ -55,12 +53,12 @@ module ysyx_25020032_IFU(
                 next_state = FETCH;
             end
             FETCH: begin
-                if(icache_valid && icache_ready) begin
+                if(icache_valid && icache_ready && !flush) begin
                     next_state = IDLE;
                 end
             end
             IDLE: begin
-                if(ifu_valid && idu_ready) begin
+                if(ifu_valid && idu_ready || flush) begin
                     next_state = FETCH;
                 end
             end
@@ -69,10 +67,11 @@ module ysyx_25020032_IFU(
     end
 
 // ======================Output Logic=======================
+    reg new_instr;
     always @(posedge clk) begin
         if(rst) begin
             icache_valid <= 1'b0;
-            ifu_valid <= 1'b0;
+            new_instr <= 1'b0;
         end
         else begin
             case(state)
@@ -80,9 +79,9 @@ module ysyx_25020032_IFU(
                     icache_valid <= 1'b1;
                 end
                 FETCH: begin
-                    if(icache_valid && icache_ready) begin
+                    if(icache_valid && icache_ready && !flush) begin
                         icache_valid <= 1'b0;
-                        ifu_valid <= 1'b1;
+                        new_instr <= 1'b1;
                         instr <= icache_instr;
 
                         `ifdef FETCH_EVENT
@@ -91,8 +90,8 @@ module ysyx_25020032_IFU(
                     end
                 end
                 IDLE: begin
-                    if(ifu_valid && idu_ready) begin
-                        ifu_valid <= 1'b0;
+                    if(ifu_valid && idu_ready || flush) begin
+                        new_instr <= 1'b0;
                         icache_valid <= 1'b1;
                     end
                 end
@@ -101,6 +100,6 @@ module ysyx_25020032_IFU(
         end
     end
 
-    assign ifu_ready = 1'b1;
+    assign ifu_valid = new_instr && !flush;
 
 endmodule

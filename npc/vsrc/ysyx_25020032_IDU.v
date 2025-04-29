@@ -50,7 +50,10 @@ module ysyx_25020032_IDU(
         input exu_valid,
         input wbu_proc_instr,
         input id_ex_reg_write,
-        input [3:0]id_ex_rd
+        input [3:0]id_ex_rd,
+
+        // Pipeline flush
+        input flush
     );
 
 `ifdef DECODE_EVENT
@@ -99,7 +102,10 @@ module ysyx_25020032_IDU(
             idu_valid_noraw <= 1'b0;
         end
         else begin
-            if(ifu_valid && idu_ready) begin
+            if(flush) begin
+                idu_valid_noraw <= 1'b0;
+            end
+            else if(ifu_valid && idu_ready) begin
                 idu_valid_noraw <= 1'b1;
                 if_id_pc <= pc;
                 if_id_instr <= instr;
@@ -110,7 +116,7 @@ module ysyx_25020032_IDU(
         end
     end
 
-    assign idu_valid = idu_valid_noraw && !isRAW;
+    assign idu_valid = idu_valid_noraw && !isRAW && !flush;
 
     reg isRAW;
     reg raw_with_exu;

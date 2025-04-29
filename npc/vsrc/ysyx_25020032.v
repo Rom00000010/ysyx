@@ -124,6 +124,8 @@ module ysyx_25020032 (
         .icache_valid(icache_valid),
         .icache_ready(icache_ready),
 
+        .flush(flush),
+
         // AXI interface
         .arid(ifu_arid), .arlen(ifu_arlen), .arburst(ifu_arburst), 
         .arsize(ifu_arsize), .araddr(ifu_araddr), .arvalid(ifu_arvalid), .arready(ifu_arready),
@@ -141,8 +143,7 @@ module ysyx_25020032 (
             .ifu_valid(ifu_valid), .idu_ready(idu_ready),
             .pc(pc), .instr(instr),
 
-            .wbu_valid(wbu_valid), .ifu_ready(ifu_ready),
-            .branch_taken(branch_taken), .branch_target(branch_target),
+            .flush(flush), .branch_target(branch_target),
 
             .icache_valid(icache_valid), .icache_ready(icache_ready),
             .icache_instr(icache_instr)
@@ -189,7 +190,9 @@ module ysyx_25020032 (
 
             .wbu_proc_instr(proc_instr), .exu_valid(exu_valid), .id_ex_reg_write(id_ex_reg_write), .id_ex_rd(id_ex_rd),
 
-            .if_id_instr(if_id_instr)
+            .if_id_instr(if_id_instr),
+
+            .flush(flush)
     );
 
     wire [31:0]alu_res;
@@ -217,6 +220,9 @@ module ysyx_25020032 (
     wire [31:0]mepc;
     wire [31:0]mtvec;
 
+    wire flush;
+    wire [31:0]branch_target;
+
     ysyx_25020032_EXU exu(  
             .clk(clock), .rst(reset),
 
@@ -239,8 +245,10 @@ module ysyx_25020032 (
 
             .wbu_valid(wbu_valid), .csr_wen(ex_wb_csr_wen), .csr_in(csr_in), .ex_wb_ext_imm(ex_wb_ext_imm),
 
-            .id_ex_instr(id_ex_instr)
-    );
+            .id_ex_instr(id_ex_instr),
+
+            .flush(flush), .branch_target(branch_target) 
+            );
 
     // Writeback result
     wire [31:0]csr_in, wdata_regd;
@@ -250,8 +258,6 @@ module ysyx_25020032 (
     wire [31:0]ex_wb_ext_imm;
 
     wire access_fault;
-    wire branch_taken;
-    wire [31:0]branch_target;
 
     wire proc_instr;
     ysyx_25020032_WBU wbu(
@@ -260,15 +266,16 @@ module ysyx_25020032 (
         .exu_valid(exu_valid), .wbu_ready(wbu_ready),
 
         .valid(id_ex_valid), .mem_wen(id_ex_mem_wen), 
-        .wb_sel(id_ex_wb_sel), .csr_write_set(id_ex_csr_write_set), .csr_wen(id_ex_csr_wen), .mem_width(id_ex_mem_width), .branch_type(id_ex_branch_type), .reg_write(id_ex_reg_write),
+        .wb_sel(id_ex_wb_sel), .csr_write_set(id_ex_csr_write_set), .csr_wen(id_ex_csr_wen), .mem_width(id_ex_mem_width), .reg_write(id_ex_reg_write),
         .csr_out(csr_out), .pc(id_ex_pc), 
-        .data_reg1(id_ex_data_reg1), .ext_imm(id_ex_ext_imm), .mtvec(mtvec), .mepc(mepc), .rd(id_ex_rd),
+        .data_reg1(id_ex_data_reg1), .ext_imm(id_ex_ext_imm), .rd(id_ex_rd),
         .raddr(raddr), .wrdata(wdata), .wmask(wmask), .alu_res(alu_res), 
 
         .wbu_valid(wbu_valid), .idu_ready(idu_ready),
 
-        .wdata_regd(wdata_regd), .csr_in(csr_in), .ex_wb_csr_wen(ex_wb_csr_wen), .access_fault(access_fault), .ex_wb_ext_imm(ex_wb_ext_imm),
-        .branch_taken(branch_taken), .branch_target(branch_target), .ex_wb_reg_write(ex_wb_reg_write), .ex_wb_rd(ex_wb_rd),
+        .wdata_regd(wdata_regd), .csr_in(csr_in), .ex_wb_csr_wen(ex_wb_csr_wen), .access_fault(access_fault), .ex_wb_ext_imm(ex_wb_ext_imm), 
+        
+        .ex_wb_reg_write(ex_wb_reg_write), .ex_wb_rd(ex_wb_rd),
 
         .proc_instr(proc_instr),
 

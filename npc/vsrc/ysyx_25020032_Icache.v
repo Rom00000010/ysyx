@@ -9,6 +9,8 @@ module ysyx_25020032_Icache(
     input [31:0] pc,
     output [31:0] instr,
 
+    input flush,
+
     // Icache->AXI synchronization
     `AXI_MASTER_READ_ADDR_PORTS
 );
@@ -38,7 +40,7 @@ module ysyx_25020032_Icache(
     always@(*) begin araddr = pc; end
 
     // Handshake signal
-    assign icache_ready = icache_valid && hit ? 1'b1 : 1'b0;
+    assign icache_ready = icache_valid && hit && !flush ? 1'b1 : 1'b0;
 
 // ======================State Machine======================
     localparam IDLE = 2'd0,
@@ -61,7 +63,7 @@ module ysyx_25020032_Icache(
         case (state)
             // Stay at IDLE if no request or hit
             IDLE: begin
-                if(icache_valid && !hit) begin
+                if(icache_valid && !hit && !flush) begin
                     next_state = FETCH;
                 end
             end
@@ -82,7 +84,7 @@ module ysyx_25020032_Icache(
     end
 
 // ======================Output Logic=======================
-    
+    reg flush_latch;
     always @(posedge clk) begin
         // Reset to known state, initialize handshake signals
         if(rst) begin
@@ -96,11 +98,13 @@ module ysyx_25020032_Icache(
             for(integer i = 0; i < 7; i = i + 1) begin
                 valid[i] <= 1'b0;
             end
+
+            flush_latch <= 1'b0;
         end
         else begin
             case (state)
                 IDLE: begin
-                    if(icache_valid && !hit) begin
+                    if(icache_valid && !hit && !flush) begin
                         arvalid <= 1'b1;
                         rready <= 1'b1;
 
@@ -109,10 +113,18 @@ module ysyx_25020032_Icache(
                             wait_cnt <= wait_cnt + 1;
                         `endif
                     end
+
+                    if(flush) begin
+                        flush_latch <= flush;
+                    end
                 end
                 FETCH: begin
                     if(arvalid && arready) begin
                         arvalid <= 1'b0;
+                    end
+
+                    if(flush) begin
+                        flush_latch <= flush;
                     end
 
                     `ifdef CACHE_EVENT
@@ -121,11 +133,15 @@ module ysyx_25020032_Icache(
                 end
                 WAIT: begin
                     if(rvalid && rready) begin
-                        cache[cache_index] <= rdata;
-                        tag[cache_index] <= cache_tag;
-                        valid[cache_index] <= 1'b1;
-
+                        if(!flush_latch)begin 
+                            cache[cache_index] <= rdata;
+                            tag[cache_index] <= cache_tag;
+                            valid[cache_index] <= 1'b1;
+                        end
+                        flush_latch <= 1'b0;
                         rready <= 1'b0;
+                    end else if(flush) begin
+                        flush_latch <= flush;
                     end
 
                     `ifdef CACHE_EVENT
@@ -137,4 +153,5 @@ module ysyx_25020032_Icache(
             endcase
         end
     end
+
 endmodule

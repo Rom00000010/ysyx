@@ -56,6 +56,9 @@ module ysyx_25020032_EXU(
         output [31:0]wdata,
         output [3:0]wmask,
 
+        output flush,
+        output [31:0]branch_target,
+
         input wbu_valid,
         input [31:0]csr_in,
         input csr_wen,
@@ -74,6 +77,11 @@ module ysyx_25020032_EXU(
             exu_valid <= 1'b0;
         end
         else begin
+            // Clear flush signal
+            if(flush) begin
+                id_ex_branch_type <= NO;
+            end
+
             if(idu_valid && exu_ready) begin
                 exu_valid <= 1'b1;
                 id_ex_alu_ctrl <= alu_ctrl;
@@ -109,7 +117,7 @@ module ysyx_25020032_EXU(
 
     ysyx_25020032_Csr csr (
         .clk(clk), .rst(rst),
-        .raddr(id_ex_ext_imm[11:0]), .waddr(ex_wb_ext_imm[11:0]), .csr_out(id_ex_csr_out), 
+        .raddr(id_ex_ext_imm[11:0]), .waddr(id_ex_ext_imm[11:0]), .csr_out(id_ex_csr_out), 
         .csr_in(csr_in), .csr_wen(csr_wen && wbu_valid),
         .exception(id_ex_ecall), .exception_pc(id_ex_pc), .exception_cause( id_ex_mcause),
         .mtvec(id_ex_mtvec), .mepc(id_ex_mepc)
@@ -195,6 +203,35 @@ module ysyx_25020032_EXU(
     assign wdata = {32{id_ex_mem_width == 3'b000}} & wbdata |
                    {32{id_ex_mem_width == 3'b001}} & (sh_mask == 4'b1100 ? {id_ex_data_reg2[15:0], 16'd0} : {16'd0, id_ex_data_reg2[15:0]}) |
                    {32{id_ex_mem_width == 3'b010}} & id_ex_data_reg2;
+
+    // ==================================================================================
+
+    // Calculate whether branch taken and target address
+
+    assign branch_target[31:0] = {32{id_ex_branch_type == JAL}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == JALR}} & (id_ex_data_reg1 + id_ex_ext_imm)&~1 |
+                           {32{id_ex_branch_type == BEQ}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == BNE}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == BLT}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == BGE}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == BLTU}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == BGEU}} & id_ex_pc+id_ex_ext_imm |
+                           {32{id_ex_branch_type == ECALL}} & id_ex_mtvec |
+                           {32{id_ex_branch_type == MRET}} & id_ex_mepc;
+
+    wire branch_taken;
+    assign branch_taken = {1{id_ex_branch_type == BEQ}} & (alu_res == 0) |
+                         {1{id_ex_branch_type == BNE}} & (alu_res != 0) |
+                         {1{id_ex_branch_type == BLT}} & (alu_res == 1) |
+                         {1{id_ex_branch_type == BGE}} & (alu_res != 1) |
+                         {1{id_ex_branch_type == BLTU}} & (alu_res == 1) |
+                         {1{id_ex_branch_type == BGEU}} & (alu_res != 1) |
+                         {1{id_ex_branch_type == JAL}} & 1'b1 |
+                         {1{id_ex_branch_type == JALR}} & 1'b1 |
+                         {1{id_ex_branch_type == ECALL}} & 1'b1 |
+                         {1{id_ex_branch_type == MRET}} & 1'b1;
+
+    assign flush = branch_taken && branch_target != (id_ex_pc+4);
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */

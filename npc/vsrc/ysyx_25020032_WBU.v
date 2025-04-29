@@ -10,7 +10,6 @@ module ysyx_25020032_WBU(
         input exu_valid,
         output reg wbu_ready,
 
-        input [3:0] branch_type,
         input [2:0]mem_width,
         input mem_wen,
         input valid,
@@ -22,8 +21,6 @@ module ysyx_25020032_WBU(
         input [31:0]ext_imm,
         input [31:0]data_reg1,
         input [31:0]csr_out,
-        input [31:0]mepc,
-        input [31:0]mtvec,
         input [31:0]pc,
         input [3:0]rd,
         input [31:0]instr,
@@ -45,8 +42,6 @@ module ysyx_25020032_WBU(
         output reg [31:0] ex_wb_ext_imm,
 
         output access_fault,
-        output [31:0]branch_target,
-        output branch_taken,
 
         output reg proc_instr,
 
@@ -80,15 +75,12 @@ module ysyx_25020032_WBU(
     wire sdram_access = ex_wb_raddr >= 32'ha0000000 && ex_wb_raddr < 32'hbfffffff;
 `endif
 
-    reg [3:0] ex_wb_branch_type;
     reg [2:0] ex_wb_mem_width;
     reg [1:0] ex_wb_wb_sel;
     reg ex_wb_csr_write_set;
     
     reg [31:0] ex_wb_data_reg1;
     reg [31:0] ex_wb_csr_out;
-    reg [31:0] ex_wb_mepc;
-    reg [31:0] ex_wb_mtvec;
     reg [31:0] ex_wb_pc;
     reg [31:0] ex_wb_raddr;
 
@@ -104,7 +96,6 @@ module ysyx_25020032_WBU(
             if(exu_valid && wbu_ready) begin
                 wbu_valid <= !valid;
 
-                ex_wb_branch_type <= branch_type;
                 ex_wb_mem_width <= mem_width;
                 ex_wb_wb_sel <= wb_sel;
                 ex_wb_csr_write_set <= csr_write_set;
@@ -115,8 +106,6 @@ module ysyx_25020032_WBU(
                 ex_wb_data_reg1 <= data_reg1;
                 ex_wb_rd <= rd;
                 ex_wb_csr_out <= csr_out;
-                ex_wb_mepc <= mepc;
-                ex_wb_mtvec <= mtvec;
                 ex_wb_pc <= pc;
 
                 ex_wb_alu_res <= alu_res;
@@ -343,62 +332,6 @@ module ysyx_25020032_WBU(
                         {32{ex_wb_wb_sel == 2'b11}} & mask_data;
 
     assign csr_in = ex_wb_csr_write_set ? ex_wb_data_reg1 | ex_wb_csr_out : ex_wb_data_reg1;
-
-    // ==================================================================================
-
-    // Calculate whether branch taken and target address
-
-    // ysyx_25020032_MuxKey #(10, 4, 32) next_pc_mux(
-    //            branch_target, ex_wb_branch_type, {
-    //                JAL,   ex_wb_pc+ex_wb_ext_imm,
-    //                JALR,  (ex_wb_data_reg1 + ex_wb_ext_imm)&~1,
-    //                BEQ,   ex_wb_pc+ex_wb_ext_imm,
-    //                BNE,   ex_wb_pc+ex_wb_ext_imm,
-    //                BLT,   ex_wb_pc+ex_wb_ext_imm,
-    //                BGE,   ex_wb_pc+ex_wb_ext_imm,
-    //                BLTU,  ex_wb_pc+ex_wb_ext_imm,
-    //                BGEU,  ex_wb_pc+ex_wb_ext_imm,
-    //                ECALL, ex_wb_mtvec,
-    //                MRET,  ex_wb_mepc
-    //            }
-    //        );
-
-    assign branch_target = {32{ex_wb_branch_type == JAL}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == JALR}} & (ex_wb_data_reg1 + ex_wb_ext_imm)&~1 |
-                           {32{ex_wb_branch_type == BEQ}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == BNE}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == BLT}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == BGE}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == BLTU}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == BGEU}} & ex_wb_pc+ex_wb_ext_imm |
-                           {32{ex_wb_branch_type == ECALL}} & ex_wb_mtvec |
-                           {32{ex_wb_branch_type == MRET}} & ex_wb_mepc;
-
-    // ysyx_25020032_MuxKeyWithDefault #(10, 4, 1) branch_taken_mux(
-    //                       branch_taken, ex_wb_branch_type, 0, {
-    //                           BEQ,   ex_wb_alu_res == 0,
-    //                           BNE,   ex_wb_alu_res!= 0,
-    //                           BLT,   ex_wb_alu_res == 1,
-    //                           BGE,   ex_wb_alu_res!= 1,
-    //                           BLTU,  ex_wb_alu_res == 1,
-    //                           BGEU,  ex_wb_alu_res!= 1,
-    //                           JAL,   1'b1,
-    //                           JALR,  1'b1,
-    //                           ECALL, 1'b1,
-    //                           MRET,  1'b1
-    //                       }
-    //                   );
-
-    assign branch_taken = {1{ex_wb_branch_type == BEQ}} & (ex_wb_alu_res == 0) |
-                         {1{ex_wb_branch_type == BNE}} & (ex_wb_alu_res != 0) |
-                         {1{ex_wb_branch_type == BLT}} & (ex_wb_alu_res == 1) |
-                         {1{ex_wb_branch_type == BGE}} & (ex_wb_alu_res != 1) |
-                         {1{ex_wb_branch_type == BLTU}} & (ex_wb_alu_res == 1) |
-                         {1{ex_wb_branch_type == BGEU}} & (ex_wb_alu_res != 1) |
-                         {1{ex_wb_branch_type == JAL}} & 1'b1 |
-                         {1{ex_wb_branch_type == JALR}} & 1'b1 |
-                         {1{ex_wb_branch_type == ECALL}} & 1'b1 |
-                         {1{ex_wb_branch_type == MRET}} & 1'b1;
 
 `ifndef SYNTHESIS   
     function automatic int wbu_skip();
