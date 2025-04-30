@@ -45,7 +45,6 @@ void get_cpu_state(CPU_state *s)
         cpu.gpr[i] = get_reg_val_by_abi(regs[i]);
     }
     SET_TOP
-    cpu.pc = get_next_pc();
 }
 
 void init_difftest(char *ref_so_file, long img_size, void *mem, int port)
@@ -115,6 +114,7 @@ void difftest_step(uint32_t pc, uint32_t next_pc)
     {
         // to skip the checking of an instruction, just copy the reg state to reference design
         get_cpu_state(&cpu);
+        cpu.pc = next_pc;
         ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
         is_skip_ref = false;
         return;

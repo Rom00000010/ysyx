@@ -39,7 +39,7 @@ module ysyx_25020032_Icache(
     assign instr = hit ? cache[cache_index] : 32'h0;
     always@(*) begin araddr = pc; end
 
-    // Handshake signal
+    // Handshake signal0;
     assign icache_ready = icache_valid && hit && !flush ? 1'b1 : 1'b0;
 
 // ======================State Machine======================
@@ -68,7 +68,10 @@ module ysyx_25020032_Icache(
                 end
             end
             FETCH: begin
-                if(arvalid && arready) begin
+                if(flush) begin
+                    next_state = IDLE;
+                end 
+                else if(arvalid && arready) begin
                     next_state = WAIT;
                 end
             end
@@ -85,10 +88,11 @@ module ysyx_25020032_Icache(
 
 // ======================Output Logic=======================
     reg flush_latch;
+    reg arvalid_reg;
     always @(posedge clk) begin
         // Reset to known state, initialize handshake signals
         if(rst) begin
-            arvalid <= 1'b0;
+            arvalid_reg <= 1'b0;
             rready <= 1'b0;
             arid <= `AXI_DEFAULT_ID;
             arlen <= `AXI_DEFAULT_LEN;
@@ -105,26 +109,19 @@ module ysyx_25020032_Icache(
             case (state)
                 IDLE: begin
                     if(icache_valid && !hit && !flush) begin
-                        arvalid <= 1'b1;
+                        arvalid_reg <= 1'b1;
                         rready <= 1'b1;
 
                         `ifdef CACHE_EVENT
-                            miss_cnt <= miss_cnt + 1;
                             wait_cnt <= wait_cnt + 1;
                         `endif
                     end
-
-                    if(flush) begin
-                        flush_latch <= flush;
-                    end
                 end
                 FETCH: begin
-                    if(arvalid && arready) begin
-                        arvalid <= 1'b0;
-                    end
-
                     if(flush) begin
-                        flush_latch <= flush;
+                        arvalid_reg <= 1'b0;
+                    end if(arvalid && arready) begin
+                        arvalid_reg <= 1'b0;
                     end
 
                     `ifdef CACHE_EVENT
@@ -137,6 +134,9 @@ module ysyx_25020032_Icache(
                             cache[cache_index] <= rdata;
                             tag[cache_index] <= cache_tag;
                             valid[cache_index] <= 1'b1;
+                            `ifdef CACHE_EVENT
+                                miss_cnt <= miss_cnt + 1;
+                            `endif
                         end
                         flush_latch <= 1'b0;
                         rready <= 1'b0;
@@ -153,5 +153,7 @@ module ysyx_25020032_Icache(
             endcase
         end
     end
+
+    assign arvalid = arvalid_reg && !flush;
 
 endmodule

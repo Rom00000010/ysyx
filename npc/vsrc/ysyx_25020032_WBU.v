@@ -213,7 +213,7 @@ module ysyx_25020032_WBU(
                         wvalid <= 1'b0;
                     end
                     // Actually equal with IFU fetch state logic
-                    else if(exu_valid && valid && !mem_wen) begin
+                    else if(exu_valid && wbu_ready && valid && !mem_wen) begin
                         arvalid <= 1'b1;
                         araddr <= raddr;
                         rready <= 1'b1;
@@ -221,7 +221,7 @@ module ysyx_25020032_WBU(
                         wbu_ready <= 1'b0;
                         proc_instr <= 1'b1;
                     end
-                    else if(exu_valid && valid && mem_wen) begin
+                    else if(exu_valid && wbu_ready && valid && mem_wen) begin
                         awvalid <= 1'b1;
                         awaddr <= raddr;
                         wvalid <= 1'b1;

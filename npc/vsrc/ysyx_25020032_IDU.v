@@ -171,7 +171,7 @@ module ysyx_25020032_IDU(
         endcase
     end
 
-    assign idu_ready = exu_ready && idu_valid_noraw && !isRAW || !idu_valid_noraw;
+    assign idu_ready = exu_ready && idu_valid || !idu_valid_noraw;
 
     // Extract instruction fields
     wire [2:0] func3 = if_id_instr[14:12];

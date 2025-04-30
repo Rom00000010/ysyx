@@ -155,6 +155,13 @@ void cpu_exec(unsigned int n)
             step_and_dump_wave(2);
             continue;
         }
+        
+        watchpoint_inspect();
+        if(stop)
+        {
+            stop = false;
+            break;
+        }
 
         // Print instruction,exec ITRACE    
         if (n <= 10)
@@ -167,10 +174,9 @@ void cpu_exec(unsigned int n)
         disassembleAndPrint(instr, log_buf, 0);
         writeBuffer(log_buf);
 
-        step_and_dump_wave(2);
-        //difftest_step(pc, next_pc);
 
-        watchpoint_inspect();
+        step_and_dump_wave(2);
+        difftest_step(pc, next_pc);
     }
 #endif
 }

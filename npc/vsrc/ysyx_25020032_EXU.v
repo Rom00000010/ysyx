@@ -77,11 +77,6 @@ module ysyx_25020032_EXU(
             exu_valid <= 1'b0;
         end
         else begin
-            // Clear flush signal
-            if(flush) begin
-                id_ex_branch_type <= NO;
-            end
-
             if(idu_valid && exu_ready) begin
                 exu_valid <= 1'b1;
                 id_ex_alu_ctrl <= alu_ctrl;
@@ -108,11 +103,12 @@ module ysyx_25020032_EXU(
             end
             else if(exu_valid && wbu_ready) begin
                 exu_valid <= 1'b0;
-            end
+                id_ex_branch_type <= NO;
+            end 
         end
     end
 
-    assign exu_ready = wbu_ready;
+    assign exu_ready = wbu_ready && exu_valid || !exu_valid;
     // =========================================================
 
     ysyx_25020032_Csr csr (
@@ -231,7 +227,7 @@ module ysyx_25020032_EXU(
                          {1{id_ex_branch_type == ECALL}} & 1'b1 |
                          {1{id_ex_branch_type == MRET}} & 1'b1;
 
-    assign flush = branch_taken && branch_target != (id_ex_pc+4);
+    assign flush = branch_taken && branch_target != (id_ex_pc+4) && wbu_ready;
 
 endmodule
 /* verilator lint_on UNUSEDSIGNAL */
